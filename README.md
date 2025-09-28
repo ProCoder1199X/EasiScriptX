@@ -36,7 +36,7 @@ ESX requires a C++20 compiler and basic libs. Tested on Ubuntu 22.04, Windows 11
 No internet needed post-install; no pip/conda.
 
 ### Building from Source
-1. Clone repo: git clone https://github.com/yourusername/esx.git cd esx
+1. Clone repo: git clone https://github.com/ProCoder1199X/EasiScriptX.git cd esx
 2. Configure CMake: mkdir build && cd build cmake .. -DUSE_CUDA=ON # Enable GPU (optional)
 3. Build: make -j4 # Adjust for cores
 4. Install (optional, system-wide): make install
@@ -51,7 +51,7 @@ No internet needed post-install; no pip/conda.
 - Full build guide: [wiki/Build.md](https://github.com/yourusername/esx/wiki/Build).
 
 ### Binary Releases
-For v1.0, download prebuilt binaries from [Releases](https://github.com/yourusername/esx/releases/tag/v1.0):
+For v1.0, download prebuilt binaries from [Releases](https://github.com/ProCoder1199X/EasiScriptX/releases/tag/v1.0):
 - Linux (x86_64)
 - Windows (x64)
 - macOS (arm64/x86)
