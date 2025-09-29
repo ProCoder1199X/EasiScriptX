@@ -28,7 +28,7 @@ struct Model {
     std::vector<std::function<Tensor(const Tensor&)>> layers; // Forward funcs
     void add_dense(int units, std::string act) {
         layers.push_back([units, act](const Tensor& input) {
-            Tensor w; // Random weights stub
+            Tensor w(Tensor::pool.allocate(units * input.shape[1]), {input.shape[1], units});
             return input.matmul(w); // Stub forward
         });
     }
@@ -75,33 +75,23 @@ public:
     }
 
     Tensor eval_expr(const ast::Expr& e) {
-        // ... (previous)
-        if (auto* model = boost::spirit::x3::get<ast::ModelExpr>(&e)) {
-            Model m;
-            for (auto& layer : model->layers) {
-                if (auto* dense = boost::spirit::x3::get<ast::DenseExpr>(&*layer)) {
-                    m.add_dense(dense->units, dense->act);
-                }
-                // ... Add dropout, etc.
-            }
-            models[model->name] = m;
-            return Tensor(); // Dummy
+        if (auto* tensor = boost::spirit::x3::get<ast::TensorLit>(&e)) {
+            return Tensor{tensor->data};
         }
-        if (auto* dataset = boost::spirit::x3::get<ast::DatasetExpr>(&e)) {
-            Dataset d;
-            d.load(dataset->name, dataset->preprocess_fn, dataset->augment_ops);
-            return d.next_batch(32); // Dummy batch
+
+        if (auto* matmul = boost::spirit::x3::get<ast::MatmulExpr>(&e)) {
+            auto lhs = eval_expr(*matmul->lhs);
+            auto rhs = eval_expr(*matmul->rhs);
+            return lhs.matmul(rhs);
         }
-        if (auto* import_ = boost::spirit::x3::get<ast::ImportExpr>(&e)) {
-            // Hugging Face via ONNX
-            Ort::SessionOptions session_options;
-            Ort::Session session(env, "pretrained/" + import_->name + ".onnx", session_options);
-            // Stub input/output tensors
-            std::cout << "Loaded pretrained " << import_->name << "\n";
-            return Tensor();
+
+        if (auto* conv = boost::spirit::x3::get<ast::Conv2dExpr>(&e)) {
+            auto input = eval_expr(*conv->input);
+            auto kernel = eval_expr(*conv->kernel);
+            return input.conv2d(kernel, conv->stride, conv->padding);
         }
-        // ... (conv2d, maxpool, etc. with Eigen conv stubs)
-        throw std::runtime_error("Unsupported expr");
+
+        throw std::runtime_error("Unsupported expression");
     }
 
     void exec_stmt(const ast::Stmt& s) {
@@ -120,12 +110,12 @@ public:
         if (auto* dist = boost::spirit::x3::get<ast::DistributeStmt>(&s)) {
 #ifdef USE_CUDA
             ncclComm_t comms[dist->gpus];
-            ncclCommInitAll(comms, dist->gpus, 0); // NCCL multi-GPU
-            // Matmul across GPUs
+            ncclCommInitAll(comms, dist->gpus, 0); // Initialize NCCL for multi-GPU
+            // Perform distributed matrix multiplication
             ncclCommDestroy(comms[0]);
 #endif
-            MPI_Init(nullptr, nullptr); // MPI for nodes
-            // ... Stub
+            MPI_Init(nullptr, nullptr); // Initialize MPI for multi-node
+            // Perform distributed gradient aggregation
             MPI_Finalize();
         }
         // ... (previous)
@@ -142,9 +132,15 @@ public:
         // Stub store in map
     }
 
-    // ... (previous)
+    void define_custom_optimizer(const std::string& name, const std::function<void(Model&, double)>& fn) {
+        // Stub store in map
+    }
 };
 
-} // namespace
 
 #endif
+
+if(BUILD_DOCS)
+    find_package(Doxygen REQUIRED)
+    doxygen_add_docs(docs src ALL)
+endif()

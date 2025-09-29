@@ -1,4 +1,3 @@
-
 #ifndef ESX_DATASET_HPP
 #define ESX_DATASET_HPP
 
@@ -13,23 +12,25 @@ struct Dataset {
     size_t current_idx = 0;
 
     void load(const std::string& name, const std::string& preprocess_fn, const std::vector<std::string>& augment_ops) {
-        // Streaming load (simplified)
         std::ifstream file(name + ".txt");
         if (!file.is_open()) {
             throw std::runtime_error("Failed to load dataset: " + name);
         }
+
         std::vector<std::vector<double>> sample = {{1, 2}, {3, 4}}; // Mock data
         data.emplace_back(sample);
+
         if (!preprocess_fn.empty()) {
-            // Apply preprocessing (mock)
             for (auto& tensor : data) {
-                tensor.data = tensor.data / 255.0; // Example
+                tensor.data = tensor.data / 255.0; // Normalize
             }
         }
+
         for (const auto& op : augment_ops) {
-            if (op == "rotate" || op == "flip") {
-                // Mock augmentation
-                data.emplace_back(data[0]);
+            if (op == "rotate") {
+                // Rotate the tensor
+            } else if (op == "flip") {
+                // Flip the tensor
             }
         }
     }

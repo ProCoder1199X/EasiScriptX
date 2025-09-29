@@ -1,4 +1,3 @@
-
 #ifndef ESX_INTERPRETER_HPP
 #define ESX_INTERPRETER_HPP
 
@@ -46,84 +45,19 @@ public:
         if (auto* tensor = boost::spirit::x3::get<ast::TensorLit>(&e)) {
             return Tensor{tensor->data};
         }
+
         if (auto* matmul = boost::spirit::x3::get<ast::MatmulExpr>(&e)) {
             auto lhs = eval_expr(*matmul->lhs);
             auto rhs = eval_expr(*matmul->rhs);
-            if (debug) std::cout << "Debug: Executing matmul with shapes (" 
-                                 << lhs.shape[0] << "," << lhs.shape[1] << ") x (" 
-                                 << rhs.shape[0] << "," << rhs.shape[1] << ")" << std::endl;
-            return ops->matmul(lhs, rhs);
+            return lhs.matmul(rhs);
         }
-        if (auto* pipe = boost::spirit::x3::get<ast::PipeExpr>(&e)) {
-            auto input = eval_expr(*pipe->lhs);
-            if (funcs.find(pipe->op) == funcs.end()) {
-                throw std::runtime_error("Unknown function: " + pipe->op);
-            }
-            return funcs[pipe->op]({input});
-        }
-        if (auto* model = boost::spirit::x3::get<ast::ModelExpr>(&e)) {
-            Model m;
-            for (const auto& layer : model->layers) {
-                if (auto* dense = boost::spirit::x3::get<ast::DenseExpr>(&*layer)) {
-                    m.add_dense(dense->units, dense->act);
-                } else if (auto* attn = boost::spirit::x3::get<ast::AttentionExpr>(&*layer)) {
-                    m.add_attention(attn->heads, attn->dim);
-                }
-            }
-            models[model->name] = m;
-            return Tensor{};
-        }
-        if (auto* dataset = boost::spirit::x3::get<ast::DatasetExpr>(&e)) {
-            Dataset d;
-            d.load(dataset->name, dataset->preprocess_fn, dataset->augment_ops);
-            return d.next_batch(32);
-        }
-        if (auto* import_ = boost::spirit::x3::get<ast::ImportExpr>(&e)) {
-            try {
-                auto module = torch::jit::load("pretrained/" + import_->name + ".pt");
-                std::vector<torch::jit::IValue> inputs{torch::ones({1, 3, 224, 224})};
-                auto output = module.forward(inputs).toTensor();
-                return Tensor{output, {static_cast<size_t>(output.size(0)), static_cast<size_t>(output.size(1))}};
-            } catch (...) {
-                Ort::SessionOptions session_options;
-                Ort::Session session(env, ("pretrained/" + import_->name + ".onnx").c_str(), session_options);
-                return Tensor{}; // Mock
-            }
-        }
+
         if (auto* conv = boost::spirit::x3::get<ast::Conv2dExpr>(&e)) {
             auto input = eval_expr(*conv->input);
             auto kernel = eval_expr(*conv->kernel);
-            return ops->conv2d(input, kernel, conv->stride, conv->padding);
+            return input.conv2d(kernel, conv->stride, conv->padding);
         }
-        if (auto* visualize = boost::spirit::x3::get<ast::VisualizeExpr>(&e)) {
-            auto data = eval_expr(*visualize->data);
-            if (visualize->type == "plot") {
-                std::cout << "Loss Curve: [";
-                auto values = data.data.cpu().accessor<float, 1>();
-                for (int i = 0; i < values.size(0); ++i) {
-                    std::cout << values[i] << (i < values.size(0) - 1 ? "," : "");
-                }
-                std::cout << "]" << std::endl;
-            } else if (visualize->type == "graph") {
-                std::cout << "Model Graph: [Simplified]" << std::endl;
-            }
-            return data;
-        }
-        if (auto* tokenize = boost::spirit::x3::get<ast::TokenizeExpr>(&e)) {
-            std::vector<int64_t> tokens;
-            std::ifstream vocab_file(tokenize->vocab);
-            if (!vocab_file.is_open()) {
-                throw std::runtime_error("Failed to load vocab: " + tokenize->vocab);
-            }
-            std::string word;
-            int idx = 0;
-            while (tokenize->text.find(" ") != std::string::npos) {
-                tokens.push_back(idx++);
-                tokenize->text = tokenize->text.substr(tokenize->text.find(" ") + 1);
-            }
-            tokens.push_back(idx);
-            return Tensor{torch::tensor(tokens), {tokens.size()}};
-        }
+
         throw std::runtime_error("Unsupported expression");
     }
 

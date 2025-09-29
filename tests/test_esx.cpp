@@ -1,4 +1,3 @@
-
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "parser.hpp"
@@ -49,9 +48,9 @@ TEST_CASE("Custom loss function") {
 
 TEST_CASE("Distributed training stub") {
     esx::runtime::Interpreter interp;
-    esx::ast::TrainStmt train; // Fill with dummy
+    esx::ast::TrainStmt train{"mymodel", "mnist", "ce", "adam", {{"lr", 0.001}}, 10, "gpu"};
     interp.exec_stmt(train);
-    REQUIRE(true); // No crash
+    REQUIRE(true); // Ensure no crash
 }
 
 TEST_CASE("Performance benchmark matmul CPU") {

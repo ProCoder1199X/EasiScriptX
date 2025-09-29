@@ -1,4 +1,3 @@
-
 #include "config.hpp"
 #include "interpreter.hpp"
 #include "parser.hpp"
@@ -27,7 +26,7 @@ bool download_model(const std::string& name, const std::string& dest) {
         return false;
     }
     // Mock URL (replace with real Hugging Face endpoint)
-    std::string url = "https://huggingface.co/models/" + name + ".pt";
+    std::string url = "https://huggingface.co/" + name + "/resolve/main/model.onnx";
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);

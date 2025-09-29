@@ -34,3 +34,6 @@ with autonomic {
     train(mymodel, mnist, loss: ce, opt: adam(lr=0.001), epochs=10, device: gpu)
 }
 ```
+
+
+

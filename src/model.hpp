@@ -1,4 +1,3 @@
-
 #ifndef ESX_MODEL_HPP
 #define ESX_MODEL_HPP
 
@@ -32,6 +31,13 @@ struct Model {
             return Tensor{output.first, {input.shape[0], static_cast<size_t>(dim)}};
         });
         parameters.push_back(torch::randn({dim, dim}));
+    }
+
+    void add_dropout(double rate) {
+        layers.push_back([rate](const Tensor& input) {
+            Tensor mask = Tensor::random_mask(input.shape, rate);
+            return input * mask;
+        });
     }
 
     Tensor forward(const Tensor& input) {

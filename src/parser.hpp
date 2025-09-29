@@ -1,4 +1,3 @@
-
 #ifndef ESX_PARSER_HPP
 #define ESX_PARSER_HPP
 
@@ -153,12 +152,13 @@ auto const visualize_expr = x3::rule<class visualize_expr, ast::VisualizeExpr>{"
 auto const tokenize_expr = x3::rule<class tokenize_expr, ast::TokenizeExpr>{"tokenize_expr"} = 
     x3::lit("tokenize") >> '(' >> x3::string >> ',' >> "vocab:" >> x3::string >> ')';
 
-auto const expr = x3::rule<class expr, ast::Expr>{"expr"} = 
-    tensor_lit | matmul_expr | pipe_expr | grad_expr | ode_solve_expr | quantize_expr | prune_expr | 
-    deploy_expr | attention_expr | gnn_conv_expr | sql_tensor_expr | factorize_expr | scale_expr | 
-    rate_reduce_expr | pico_bench_expr | mobi_prune_expr | reasoning_pass_expr | model_expr | 
-    dataset_expr | conv2d_expr | maxpool_expr | batchnorm_expr | layernorm_expr | sparse_tensor_lit | 
-    import_expr | visualize_expr | tokenize_expr;
+auto const expr = x3::rule<class expr, ast::Expr>{"expr"} =
+    tensor_lit | matmul_expr | pipe_expr | grad_expr | ode_solve_expr | quantize_expr |
+    prune_expr | deploy_expr | attention_expr | gnn_conv_expr | sql_tensor_expr |
+    factorize_expr | scale_expr | rate_reduce_expr | pico_bench_expr | mobi_prune_expr |
+    reasoning_pass_expr | model_expr | dataset_expr | conv2d_expr | maxpool_expr |
+    batchnorm_expr | layernorm_expr | sparse_tensor_lit | import_expr | visualize_expr |
+    tokenize_expr;
 
 auto const stmt = x3::rule<class stmt, ast::Stmt>{"stmt"} = 
     train_stmt | autonomic_stmt | agent_tune_stmt | if_stmt | for_stmt | while_stmt | fn_decl | profile_stmt;
