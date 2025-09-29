@@ -1,0 +1,1 @@
+let model = load_pretrained("resnet50");

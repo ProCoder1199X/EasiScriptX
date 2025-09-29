@@ -1,0 +1,3 @@
+fn custom_loss(pred, true_val) {
+    return mean((pred - true_val)^2);
+}
