@@ -1,3 +1,4 @@
 distribute(gpus: 2) {
     train(mymodel, mnist, loss: ce, opt: adam(lr=0.001), epochs=5)
 }
+
