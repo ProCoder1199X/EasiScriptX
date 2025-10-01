@@ -4,292 +4,107 @@
 
 #include "ast.hpp"
 #include <iostream>
+#include <string>
 
-namespace esx::ast {
-struct Printer {
-    void operator()(const TensorLit& t) const {
-        std::cout << "tensor([";
-        for (size_t i = 0; i < t.data.size(); ++i) {
-            std::cout << "[";
-            for (size_t j = 0; j < t.data[i].size(); ++j) {
-                std::cout << t.data[i][j];
-                if (j < t.data[i].size() - 1) std::cout << ",";
-            }
-            std::cout << "]";
-            if (i < t.data.size() - 1) std::cout << ",";
-        }
-        std::cout << "])";
-    }
+/**
+ * @file printer.hpp
+ * @brief AST printer for EasiScriptX (ESX).
+ * @details Prints AST nodes for debugging, supporting all ESX syntax elements including
+ * LLM fine-tuning, mixed-precision, and enterprise features.
+ */
 
-    void operator()(const PipeExpr& p) const {
-        std::cout << "(";
-        std::visit(*this, p.lhs->get());
-        std::cout << " |> " << p.op << ")";
-    }
+namespace esx::printer {
 
-    void operator()(const TrainStmt& t) const {
-        std::cout << "train(" << t.model << ", " << t.data << ", loss: " << t.loss
-                  << ", opt: " << t.opt << ", params: [";
-        for (size_t i = 0; i < t.opt_params.size(); ++i) {
-            std::cout << t.opt_params[i].first << "=" << t.opt_params[i].second;
-            if (i < t.opt_params.size() - 1) std::cout << ",";
-        }
-        std::cout << "], epochs=" << t.epochs << ", device: " << t.device << ")";
-    }
-
-    void operator()(const AutonomicStmt& a) const {
-        std::cout << "with autonomic { ";
-        std::visit(*this, a.body->get());
-        std::cout << " }";
-    }
-
-    void operator()(const AgentTuneStmt& a) const {
-        std::cout << "multi_agent_tune(" << a.fn << ", agents: " << a.agents 
-                  << ", target: " << a.target << ")";
-    }
-
-    void operator()(const MatmulExpr& m) const {
-        std::cout << "(";
-        std::visit(*this, m.lhs->get());
-        std::cout << " @ ";
-        std::visit(*this, m.rhs->get());
-        std::cout << ")";
-    }
-
-    void operator()(const IfStmt& i) const {
-        std::cout << "if ";
-        std::visit(*this, i.cond->get());
-        std::cout << " { ";
-        std::visit(*this, i.then_body->get());
-        std::cout << " }";
-        if (i.else_body) {
-            std::cout << " else { ";
-            std::visit(*this, i.else_body->get());
-            std::cout << " }";
+class Printer {
+public:
+    void print(const ast::Program& program) {
+        for (const auto& stmt : program.stmts) {
+            print_stmt(stmt, 0);
         }
     }
 
-    void operator()(const ForStmt& f) const {
-        std::cout << "for " << f.var << " in ";
-        std::visit(*this, f.start->get());
-        std::cout << ".." << f.end->get() << " { ";
-        std::visit(*this, f.body->get());
-        std::cout << " }";
+private:
+    void indent(int level) {
+        std::cout << std::string(level * 2, ' ');
     }
 
-    void operator()(const WhileStmt& w) const {
-        std::cout << "while ";
-        std::visit(*this, w.cond->get());
-        std::cout << " { ";
-        std::visit(*this, w.body->get());
-        std::cout << " }";
-    }
-
-    void operator()(const GradExpr& g) const {
-        std::cout << "grad(";
-        std::visit(*this, g.fn->get());
-        std::cout << ")";
-    }
-
-    void operator()(const OdeSolveExpr& o) const {
-        std::cout << "ode_solve(" << o.eq << ", " << o.y0 << ", [";
-        for (size_t i = 0; i < o.t.size(); ++i) {
-            std::cout << o.t[i];
-            if (i < o.t.size() - 1) std::cout << ",";
+    void print_expr(const std::shared_ptr<ast::Expr>& expr, int level) {
+        indent(level);
+        if (auto* ident = dynamic_cast<ast::IdentExpr*>(expr.get())) {
+            std::cout << "IdentExpr(name=" << ident->name << ") at line " << ident->loc.line << std::endl;
+        } else if (auto* lit = dynamic_cast<ast::TensorLitExpr*>(expr.get())) {
+            std::cout << "TensorLitExpr(values=...) at line " << lit->loc.line << std::endl;
+        } else if (auto* matmul = dynamic_cast<ast::MatmulExpr*>(expr.get())) {
+            std::cout << "MatmulExpr at line " << matmul->loc.line << std::endl;
+            print_expr(matmul->left, level + 1);
+            print_expr(matmul->right, level + 1);
+        } else if (auto* conv = dynamic_cast<ast::Conv2dExpr*>(expr.get())) {
+            std::cout << "Conv2dExpr(stride=" << conv->stride << ", padding=" << conv->padding
+                      << ") at line " << conv->loc.line << std::endl;
+            print_expr(conv->input, level + 1);
+            print_expr(conv->kernel, level + 1);
+        } else if (auto* attn = dynamic_cast<ast::AttentionExpr*>(expr.get())) {
+            std::cout << "AttentionExpr(heads=" << attn->heads << ", dim=" << attn->dim
+                      << ", flash=" << (attn->use_flash_attention ? "true" : "false")
+                      << ") at line " << attn->loc.line << std::endl;
+            print_expr(attn->q, level + 1);
+            print_expr(attn->k, level + 1);
+            print_expr(attn->v, level + 1);
+        } else if (auto* lora = dynamic_cast<ast::LoRAExpr*>(expr.get())) {
+            std::cout << "LoRAExpr(rank=" << lora->rank << ") at line " << lora->loc.line << std::endl;
+            print_expr(lora->model, level + 1);
+        } else if (auto* mp = dynamic_cast<ast::MixedPrecisionExpr*>(expr.get())) {
+            std::cout << "MixedPrecisionExpr(precision=" << mp->precision << ") at line "
+                      << mp->loc.line << std::endl;
+            print_expr(mp->model, level + 1);
+        } else {
+            std::cout << "UnknownExpr at line " << expr->loc.line << std::endl;
         }
-        std::cout << "])";
     }
 
-    void operator()(const QuantizeExpr& q) const {
-        std::cout << "quantize(bits=" << q.bits << ", aware: " << q.aware << ")";
-    }
-
-    void operator()(const PruneExpr& p) const {
-        std::cout << "prune(ratio=" << p.ratio << ")";
-    }
-
-    void operator()(const DeployExpr& d) const {
-        std::cout << "deploy(target: " << d.target << ", device: " << d.device << ")";
-    }
-
-    void operator()(const AttentionExpr& a) const {
-        std::cout << "attention(";
-        std::visit(*this, a.q->get());
-        std::cout << ", ";
-        std::visit(*this, a.k->get());
-        std::cout << ", ";
-        std::visit(*this, a.v->get());
-        std::cout << ", heads=" << a.heads << ", dim=" << a.dim << ")";
-    }
-
-    void operator()(const GnnConvExpr& g) const {
-        std::cout << "gnn_conv(";
-        std::visit(*this, g.graph->get());
-        std::cout << ", ";
-        std::visit(*this, g.feats->get());
-        std::cout << ")";
-    }
-
-    void operator()(const SqlTensorExpr& s) const {
-        std::cout << "sql_tensor(";
-        std::visit(*this, s.mat->get());
-        std::cout << ", " << s.query << ")";
-    }
-
-    void operator()(const FactorizeExpr& f) const {
-        std::cout << "factorize(";
-        std::visit(*this, f.layer->get());
-        std::cout << ", mode: " << f.mode << ")";
-    }
-
-    void operator()(const ScaleExpr& s) const {
-        std::cout << "scale(";
-        std::visit(*this, s.model->get());
-        std::cout << ", factor=" << s.factor << ")";
-    }
-
-    void operator()(const RateReduceExpr& r) const {
-        std::cout << "rate_reduce(";
-        std::visit(*this, r.data->get());
-        std::cout << ", freq=" << r.freq << ")";
-    }
-
-    void operator()(const PicoBenchExpr& p) const {
-        std::cout << "pico_bench(";
-        std::visit(*this, p.model->get());
-        std::cout << ", suite: " << p.suite << ")";
-    }
-
-    void operator()(const MobiPruneExpr& m) const {
-        std::cout << "mobi_prune(battery: " << (m.battery ? "true" : "false") << ")";
-    }
-
-    void operator()(const ReasoningPassExpr& r) const {
-        std::cout << "reasoning_pass(";
-        std::visit(*this, r.fn->get());
-        std::cout << ", target: " << r.target << ")";
-    }
-
-    void operator()(const FnDecl& f) const {
-        std::cout << "fn " << f.name << "(";
-        for (size_t i = 0; i < f.params.size(); ++i) {
-            std::cout << f.params[i];
-            if (i < f.params.size() - 1) std::cout << ",";
-        }
-        std::cout << ") -> " << f.ret_type << " { ";
-        std::visit(*this, f.body->get());
-        std::cout << " }";
-    }
-
-    void operator()(const ModelExpr& m) const {
-        std::cout << "model " << m.name << " { ";
-        for (const auto& layer : m.layers) {
-            std::visit(*this, layer->get());
-            std::cout << "; ";
-        }
-        std::cout << " }";
-    }
-
-    void operator()(const DatasetExpr& d) const {
-        std::cout << "load_dataset(" << d.name << ", preprocess: " << d.preprocess_fn 
-                  << ", augment: [";
-        for (size_t i = 0; i < d.augment_ops.size(); ++i) {
-            std::cout << d.augment_ops[i];
-            if (i < d.augment_ops.size() - 1) std::cout << ",";
-        }
-        std::cout << "])";
-    }
-
-    void operator()(const Conv2dExpr& c) const {
-        std::cout << "conv2d(";
-        std::visit(*this, c.input->get());
-        std::cout << ", ";
-        std::visit(*this, c.kernel->get());
-        std::cout << ", stride=" << c.stride << ", padding=" << c.padding << ")";
-    }
-
-    void operator()(const MaxPoolExpr& m) const {
-        std::cout << "maxpool(";
-        std::visit(*this, m.input->get());
-        std::cout << ", pool_size=(" << m.pool_size[0] << "," << m.pool_size[1] << "))";
-    }
-
-    void operator()(const BatchNormExpr& b) const {
-        std::cout << "batchnorm(";
-        std::visit(*this, b.input->get());
-        std::cout << ")";
-    }
-
-    void operator()(const LayerNormExpr& l) const {
-        std::cout << "layernorm(";
-        std::visit(*this, l.input->get());
-        std::cout << ")";
-    }
-
-    void operator()(const SparseTensorLit& s) const {
-        std::cout << "sparse_tensor([";
-        for (size_t i = 0; i < s.indices_values.size(); ++i) {
-            std::cout << "[";
-            for (size_t j = 0; j < s.indices_values[i].first.size(); ++j) {
-                std::cout << s.indices_values[i].first[j];
-                if (j < s.indices_values[i].first.size() - 1) std::cout << ",";
-            }
-            std::cout << "]:" << s.indices_values[i].second;
-            if (i < s.indices_values.size() - 1) std::cout << ",";
-        }
-        std::cout << "], shape=[";
-        for (size_t i = 0; i < s.shape.size(); ++i) {
-            std::cout << s.shape[i];
-            if (i < s.shape.size() - 1) std::cout << ",";
-        }
-        std::cout << "])";
-    }
-
-    void operator()(const ImportExpr& i) const {
-        std::cout << "load_pretrained(" << i.name << ")";
-    }
-
-    void operator()(const ProfileStmt& p) const {
-        std::cout << "profile { ";
-        std::visit(*this, p.body->get());
-        std::cout << " }";
-    }
-
-    void operator()(const VisualizeExpr& v) const {
-        std::cout << "visualize(";
-        std::visit(*this, v.data->get());
-        std::cout << ", type: " << v.type << ")";
-    }
-
-    void operator()(const TokenizeExpr& t) const {
-        std::cout << "tokenize(" << t.text << ", vocab: " << t.vocab << ")";
-    }
-
-    void operator()(const Expr& e) const {
-        std::visit(*this, e);
-    }
-
-    void operator()(const Stmt& s) const {
-        std::visit(*this, s);
-    }
-
-    void operator()(const Decl& d) const {
-        std::cout << "let " << d.var << " = ";
-        std::visit(*this, d.expr);
-    }
-
-    void operator()(const Program& p) const {
-        for (const auto& decl : p.decls) {
-            (*this)(decl);
-            std::cout << ";\n";
-        }
-        for (const auto& stmt : p.stmts) {
-            std::visit(*this, stmt);
-            std::cout << ";\n";
+    void print_stmt(const std::shared_ptr<ast::Stmt>& stmt, int level) {
+        indent(level);
+        if (auto* let = dynamic_cast<ast::LetStmt*>(stmt.get())) {
+            std::cout << "LetStmt(name=" << let->name << ") at line " << let->loc.line << std::endl;
+            print_expr(let->expr, level + 1);
+        } else if (auto* train = dynamic_cast<ast::TrainStmt*>(stmt.get())) {
+            std::cout << "TrainStmt(loss=" << train->loss << ", opt=" << train->opt
+                      << ", epochs=" << train->epochs << ", device=" << train->device
+                      << ") at line " << train->loc.line << std::endl;
+            print_expr(train->model, level + 1);
+            print_expr(train->dataset, level + 1);
+        } else if (auto* pp = dynamic_cast<ast::PipelineParallelStmt*>(stmt.get())) {
+            std::cout << "PipelineParallelStmt(stages=" << pp->stages << ") at line "
+                      << pp->loc.line << std::endl;
+            print_expr(pp->model, level + 1);
+        } else if (auto* it = dynamic_cast<ast::InstructionTuneStmt*>(stmt.get())) {
+            std::cout << "InstructionTuneStmt(prompts=" << it->prompts << ") at line "
+                      << it->loc.line << std::endl;
+            print_expr(it->model, level + 1);
+            print_expr(it->dataset, level + 1);
+        } else if (auto* da = dynamic_cast<ast::DomainAdaptStmt*>(stmt.get())) {
+            std::cout << "DomainAdaptStmt(domain=" << da->domain << ") at line "
+                      << da->loc.line << std::endl;
+            print_expr(da->model, level + 1);
+        } else if (auto* hs = dynamic_cast<ast::HeterogeneousScheduleStmt*>(stmt.get())) {
+            std::cout << "HeterogeneousScheduleStmt(cpu=" << hs->cpu_ratio
+                      << ", gpu=" << hs->gpu_ratio << ") at line " << hs->loc.line << std::endl;
+        } else if (auto* ea = dynamic_cast<ast::EnergyAwareStmt*>(stmt.get())) {
+            std::cout << "EnergyAwareStmt(max_power=" << ea->max_power << "W) at line "
+                      << ea->loc.line << std::endl;
+            print_expr(ea->model, level + 1);
+        } else if (auto* sf = dynamic_cast<ast::SwitchFrameworkStmt*>(stmt.get())) {
+            std::cout << "SwitchFrameworkStmt(framework=" << sf->framework
+                      << ", path=" << sf->model_path << ") at line " << sf->loc.line << std::endl;
+        } else if (auto* te = dynamic_cast<ast::TrackExperimentStmt*>(stmt.get())) {
+            std::cout << "TrackExperimentStmt(tracker=" << te->tracker
+                      << ", run_id=" << te->run_id << ") at line " << te->loc.line << std::endl;
+        } else {
+            std::cout << "UnknownStmt at line " << stmt->loc.line << std::endl;
         }
     }
 };
 
-} // namespace esx::ast
+} // namespace esx::printer
 
 #endif // ESX_PRINTER_HPP

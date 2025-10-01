@@ -60,7 +60,6 @@ struct Model {
     }
 
     void checkpoint(const Tensor& loss) {
-        // Recompute activations to save memory
         for (auto& param : parameters) {
             param.grad() = torch::ones_like(param); // Simplified
         }
@@ -104,6 +103,13 @@ struct Opt {
         for (auto& param : model.parameters) {
             if (param.grad().defined()) {
                 param -= lr * param.grad() * 0.8; // Mock scaling
+            }
+        }
+    }
+    static void lomo(Model& model, double lr) {
+        for (auto& param : model.parameters) {
+            if (param.grad().defined()) {
+                param -= lr * param.grad() * 0.9; // Mock trust ratio
             }
         }
     }

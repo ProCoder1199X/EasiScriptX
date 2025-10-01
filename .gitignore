@@ -5,5 +5,5 @@ test_esx
 .vscode/
 pretrained/
 docs/api/
-node_modules/
-extension/
+esx.log
+*.swp

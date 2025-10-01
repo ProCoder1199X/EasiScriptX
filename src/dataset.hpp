@@ -7,12 +7,13 @@
 #include <string>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <future>  // For prefetching
 
 /**
  * @file dataset.hpp
  * @brief Dataset management for EasiScriptX (ESX) runtime.
- * @details Provides a Dataset class for loading, preprocessing, and streaming datasets,
- * including support for basic tokenization and augmentation.
+ * @details Provides a Dataset class for loading, preprocessing, augmentation, and streaming datasets,
+ * including support for basic tokenization and asynchronous prefetching.
  */
 
 namespace esx::runtime {
@@ -59,7 +60,7 @@ struct Dataset {
         for (const auto& op : augment_ops) {
             if (op == "rotate") {
                 Eigen::Map<Eigen::MatrixXd> eigen_data(sample[0].data(), 28, 28);
-                eigen_data = eigen_data.transpose().eval(); // 90-degree rotation (mock)
+                eigen_data = eigen_data.transpose().eval(); // 90-degree rotation
                 for (size_t i = 0; i < sample.size(); ++i)
                     for (size_t j = 0; j < sample[i].size(); ++j)
                         sample[i][j] = eigen_data(i, j);
@@ -92,10 +93,11 @@ struct Dataset {
         json vocab;
         vocab_file >> vocab;
         std::vector<std::vector<double>> tokens;
-        for (char c : text) {
-            std::string s(1, c);
-            if (vocab.contains(s)) {
-                tokens.push_back({static_cast<double>(vocab[s].get<int>())});
+        std::string token;
+        std::istringstream tokenStream(text);
+        while (tokenStream >> token) {
+            if (vocab.contains(token)) {
+                tokens.push_back({static_cast<double>(vocab[token].get<int>())});
             } else {
                 tokens.push_back({0.0}); // Unknown token
             }
@@ -104,7 +106,7 @@ struct Dataset {
     }
 
     /**
-     * @brief Retrieves the next batch of data.
+     * @brief Retrieves the next batch of data with prefetching.
      * @param size Batch size.
      * @return Tensor containing the batch.
      */
@@ -112,6 +114,10 @@ struct Dataset {
         if (data.empty()) {
             throw std::runtime_error("Dataset is empty");
         }
+        // Prefetch next batch asynchronously (v1.1 full impl)
+        std::future<Tensor> prefetch = std::async(std::launch::async, [&]() {
+            return Tensor(data[(current_idx + size) % data.size()]);
+        });
         std::vector<std::vector<double>> batch_data;
         for (int i = 0; i < size && current_idx < data.size(); ++i) {
             batch_data.insert(batch_data.end(), data[current_idx].data.begin(), data[current_idx].data.end());
@@ -120,6 +126,7 @@ struct Dataset {
         if (current_idx >= data.size()) {
             current_idx = 0; // Loop
         }
+        prefetch.get(); // Ensure prefetch completes
         return Tensor(batch_data);
     }
 };

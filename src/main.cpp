@@ -1,149 +1,72 @@
-#include "config.hpp"
-#include "interpreter.hpp"
 #include "parser.hpp"
+#include "interpreter.hpp"
 #include "printer.hpp"
-#include <boost/spirit/home/x3.hpp>
-#include <torch/torch.h>
 #include <fstream>
 #include <iostream>
 #include <string>
-#include <curl/curl.h>
-#include <filesystem>
 
-namespace esx {
-// Callback for curl to write downloaded file
-size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* stream) {
-    return fwrite(ptr, size, nmemb, stream);
-}
-
-// Download pretrained model
-bool download_model(const std::string& name, const std::string& dest) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return false;
-    FILE* fp = fopen(dest.c_str(), "wb");
-    if (!fp) {
-        curl_easy_cleanup(curl);
-        return false;
-    }
-    // Mock URL (replace with real Hugging Face endpoint)
-    std::string url = "https://huggingface.co/" + name + "/resolve/main/model.onnx";
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-    CURLcode res = curl_easy_perform(curl);
-    fclose(fp);
-    curl_easy_cleanup(curl);
-    return res == CURLE_OK;
-}
+/**
+ * @file main.cpp
+ * @brief Entry point for EasiScriptX (ESX).
+ * @details Reads ESX source code, parses it into an AST, and executes it using the interpreter.
+ * Supports debugging, energy-aware scheduling, and MLflow tracking.
+ */
 
 int main(int argc, char* argv[]) {
     bool debug = false;
+    bool energy_aware = false;
+    bool mlflow = false;
     std::string filename;
-    std::string log_file = "esx.log";
 
-    // Initialize CUDA if enabled
-#ifdef USE_CUDA
-    if (torch::cuda::is_available()) {
-        torch::cuda::manual_seed_all(42);
-    } else if (USE_CUDA) {
-        std::cerr << "Warning: CUDA enabled but not available. Falling back to CPU." << std::endl;
-    }
-#endif
-
-    // Parse command-line arguments
     for (int i = 1; i < argc; ++i) {
-        if (std::string(argv[i]) == "--debug") {
+        std::string arg = argv[i];
+        if (arg == "--debug") {
             debug = true;
-        } else if (std::string(argv[i]) == "install" && i + 1 < argc) {
-            std::string package = argv[i + 1];
-            std::cout << "Installing package: " << package << std::endl;
-            std::filesystem::create_directory("pretrained");
-            std::string dest = "pretrained/" + package + ".pt";
-            if (!download_model(package, dest)) {
-                std::cerr << "Error: Failed to download package: " << package << std::endl;
-                return 3; // Package install error
-            }
-            std::cout << "Downloaded " << package << " to " << dest << std::endl;
-            return 0;
+        } else if (arg == "--energy-aware") {
+            energy_aware = true;
+        } else if (arg == "--mlflow") {
+            mlflow = true;
         } else {
-            filename = argv[i];
+            filename = arg;
         }
     }
 
     if (filename.empty()) {
-        std::cerr << "Usage: esx [--debug] <filename.esx> | install <package>" << std::endl;
-        return 1; // Invalid usage
+        std::cerr << "Usage: " << argv[0] << " [--debug] [--energy-aware] [--mlflow] <script.esx>" << std::endl;
+        return 1;
     }
 
-    // Open log file for debug mode
-    std::ofstream log;
-    if (debug) {
-        log.open(log_file, std::ios::app);
-        if (!log.is_open()) {
-            std::cerr << "Warning: Failed to open log file: " << log_file << std::endl;
-        }
-    }
-
-    // Open the script file
     std::ifstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Error: Failed to open file: " << filename << std::endl;
-        if (debug && log.is_open()) log << "Error: Failed to open file: " << filename << std::endl;
-        return 2; // File error
+        std::cerr << "Error: Cannot open file '" << filename << "'. Please check the file path." << std::endl;
+        return 1;
     }
 
-    // Read the script content
-    std::string input((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    std::string source((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     file.close();
 
-    esx::ast::Program program;
-    auto iter = input.begin();
-    auto end = input.end();
-
     try {
-        // Parse the script
-        bool parsed = boost::spirit::x3::phrase_parse(iter, end, esx::parser::program, esx::parser::skip, program);
-        if (!parsed || iter != end) {
-            size_t line = std::count(input.begin(), iter, '\n') + 1;
-            size_t col = iter - std::find_if_not(input.begin(), iter, [](char c) { return c != '\n'; }) + 1;
-            std::string token(iter, std::min(iter + 10, end));
-            std::cerr << "Parse Error: Unexpected token '" << token << "' at line " << line << ", column " << col
-                      << ". Expected valid expression or statement." << std::endl;
-            if (debug && log.is_open()) {
-                log << "Parse Error: Unexpected token '" << token << "' at line " << line << ", column " << col << std::endl;
-            }
-            return 2; // Parse error
-        }
-
-        // Print the parsed AST (debug mode)
+        esx::ast::Program program = esx::parser::parse(source);
         if (debug) {
-            esx::ast::Printer printer;
-            std::stringstream ast_out;
-            std::streambuf* cout_buf = std::cout.rdbuf();
-            std::cout.rdbuf(ast_out.rdbuf());
-            printer(program);
-            std::cout.rdbuf(cout_buf);
-            std::cout << "Debug: AST:\n" << ast_out.str() << std::endl;
-            if (log.is_open()) log << "Debug: AST:\n" << ast_out.str() << std::endl;
+            esx::printer::Printer printer;
+            printer.print(program);
         }
-
-        // Initialize interpreter
         esx::runtime::Interpreter interpreter;
-#ifdef USE_CUDA
-        if (torch::cuda::is_available()) {
-            interpreter.ops = std::make_unique<esx::runtime::GPUTensorOps>();
-        }
-#endif
-        // Execute the program
-        interpreter.execute(program, debug);
+        interpreter.run(program);
 
+        if (energy_aware) {
+            std::cout << "Energy-aware mode enabled. Tracking energy usage during execution." << std::endl;
+            std::cout << "Total energy usage: " << interpreter.get_energy_usage() << " J" << std::endl;
+        }
+
+        if (mlflow) {
+            std::cout << "MLflow tracking enabled. Experiment data will be logged." << std::endl;
+            interpreter.track_experiment("mlflow");
+        }
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-        if (debug && log.is_open()) log << "Error: " << e.what() << std::endl;
-        return 3; // Runtime error
+        std::cerr << "Error: " << e.what() << ". Please check the script for syntax or runtime issues." << std::endl;
+        return 1;
     }
 
-    if (log.is_open()) log.close();
     return 0;
 }
-} // namespace esx
