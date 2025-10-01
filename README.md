@@ -162,8 +162,8 @@ fn custom_loss(pred, true_val) {
 - Efficient Data Pipelines: Streaming prefetching and parallel tokenization (Jain 2025) reduce data loading time by 40%. Supports Hugging Face datasets for rapid prototyping.
 - Experiment Tracking: Integrates with MLflow for reproducible experiments (Valohai 2025), ensuring traceability in enterprise settings.
 - Developer-Friendly Syntax: Declarative DSL simplifies AI/ML workflows (e.g., train(model, dataset, loss:ce, opt:lomo)), reducing boilerplate code by 50% compared to raw PyTorch/TensorFlow. I guess , easier learning curve too.
-- Optimized for Low-End Hardware: Achieves 3x CPU speedup on i3 11th Gen via ZO2 optimizer and Eigen/SIMD (Zeng 2024). Suitable for hobbyists and developers with limited resources.
-- Modular and Extensible: Inspired by Synapse’s agent-based architecture, ESX’s modular design supports future extensions (e.g., ARC-AGI2 pattern recognition, new optimizers).
+- Optimized for Low-End Hardware: Achieves 3x CPU speedup  via ZO2 optimizer and Eigen/SIMD (Zeng 2024). Suitable for hobbyists and developers with limited resources. (need validation)
+
 
 ### License
 EasiScriptX is licensed under the MIT License. See LICENSE.txt for details.
