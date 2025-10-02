@@ -147,11 +147,11 @@ fn custom_loss(pred, true_val) {
 
 ### Advantages of EasiScriptX (ESX) v1.0
 
--Parameter-Efficient Fine-Tuning (LoRA): Reduces memory usage by up to 80% compared to full fine-tuning (Chen 2025), enabling efficient LLM adaptation on resource-constrained devices like an i3 11th Gen CPU. Ideal for fine-tuning models like Llama 3.1 on custom datasets.
+-Parameter-Efficient Fine-Tuning (LoRA): Reduces memory usage by up to 80% compared to full fine-tuning (Chen 2025), enabling efficient LLM adaptation on resource-constrained devices. Ideal for fine-tuning models like Llama 3.1 on custom datasets.
 
 - High-Performance Attention (FlashAttention-2): Achieves 1.5–2x speedup and 50% memory reduction for transformer attention (Dao 2024). Optimized for GPU (via CUDA/NCCL) and CPU (via Eigen/SIMD), making ESX suitable for both low-end and high-end hardware.
 
-- Mixed-Precision Training (BF16/FP16): Reduces memory footprint by 20–30% and speeds up training by 25% (Micikevicius 2025). Seamlessly integrates with PyTorch for robust model training on your i3 CPU.
+- Mixed-Precision Training (BF16/FP16): Reduces memory footprint by 20–30% and speeds up training by 25% (Micikevicius 2025). Seamlessly integrates with PyTorch for robust model training on low end hardware
   
 - Pipeline Parallelism (PPSD/AdaPtis): Enables 30–50% faster training for large models by splitting layers across devices (Shoeybi 2024, Aminabadi 2024). Supports multi-GPU and multi-node setups via NCCL/MPI.
   
