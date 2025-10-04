@@ -17,7 +17,7 @@
 
 
 
-## Research Foundations and Implemented Features
+### Research Foundations and Implemented Features
 EasiScriptX (ESX) is built on several key research papers and concepts to deliver a high-performance DSL for AI/ML workflows. Below are the research foundations and their implementations in ESX:
 
 -  Transformers (Vaswani et al., "Attention is All You Need," 2017)
