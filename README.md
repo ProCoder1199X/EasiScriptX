@@ -224,7 +224,7 @@ fn custom_loss(pred, true_val) {
                  }
   ```
 ---
-<<<<<<< HEAD
+
 
 - Memory Optimization
 
