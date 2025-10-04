@@ -1,0 +1,30 @@
+# EasiScriptXConfig.cmake.in
+# CMake configuration file for EasiScriptX
+
+@PACKAGE_INIT@
+
+# Include directories
+set(EasiScriptX_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include/esx")
+
+# Library directories
+set(EasiScriptX_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/lib")
+
+# Libraries
+set(EasiScriptX_LIBRARIES "")
+
+# Executables
+set(EasiScriptX_EXECUTABLES "@CMAKE_INSTALL_PREFIX@/bin/esx")
+
+# Version
+set(EasiScriptX_VERSION "@PROJECT_VERSION@")
+
+# Features
+set(EasiScriptX_HAS_ONNX @USE_ONNX@)
+set(EasiScriptX_HAS_CUDA @USE_CUDA@)
+set(EasiScriptX_HAS_MPI @USE_MPI@)
+set(EasiScriptX_HAS_TORCH @USE_TORCH@)
+
+# Check if all required components are available
+include(CheckRequiredComponent)
+
+check_required_components(EasiScriptX)

@@ -224,7 +224,6 @@ fn custom_loss(pred, true_val) {
                  }
   ```
 ---
-<<<<<<< HEAD
 
 - Memory Optimization
 
@@ -368,8 +367,6 @@ EasiScriptX delivers significant performance improvements:
 
 The CI/CD pipeline will automatically test your changes across multiple platforms.
 
-=======
->>>>>>> 31f2fcea1a0108a1e9472d34db069ccbf4e2deef
 ### License
 EasiScriptX is licensed under the MIT License. See LICENSE.txt for details.
 

@@ -1,97 +1,298 @@
 cmake_minimum_required(VERSION 3.20)
-project(ESX VERSION 1.0)
+project(EasiScriptX VERSION 1.0.0 LANGUAGES CXX)
 
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -march=native")
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(BUILD_TESTS "Build unit tests" ON)
-option(BUILD_DOCS "Build documentation" ON)
-option(USE_CUDA "Enable CUDA" OFF)
-
-find_package(Boost 1.85 REQUIRED COMPONENTS spirit)
-find_path(EIGEN_INCLUDE_DIR Eigen/Core REQUIRED)
-find_package(OpenMP REQUIRED)
-find_package(onnxruntime REQUIRED)
-find_package(OpenMPI REQUIRED)
-find_package(Torch REQUIRED)
-find_package(TensorFlow OPTIONAL)
-find_package(CURL REQUIRED)
-if(USE_CUDA)
-    enable_language(CUDA)
-    find_library(CUBLAS_LIBRARY cublas)
-    find_library(NCCL_LIBRARY nccl)
+# Build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_executable(esx 
+# Compiler flags
+if(MSVC)
+    add_compile_options(/W4 /permissive-)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+endif()
+
+# Include directories
+include_directories(src)
+
+# Find packages
+find_package(Boost REQUIRED COMPONENTS system filesystem)
+find_package(Eigen3 REQUIRED)
+find_package(Threads REQUIRED)
+
+# Optional dependencies
+find_package(MPI COMPONENTS CXX)
+if(MPI_CXX_FOUND)
+    add_definitions(-DUSE_MPI=1)
+    message(STATUS "MPI found: ${MPI_CXX_VERSION}")
+else()
+    add_definitions(-DUSE_MPI=0)
+    message(STATUS "MPI not found, distributed training disabled")
+endif()
+
+# CUDA support
+find_package(CUDA QUIET)
+if(CUDA_FOUND)
+    enable_language(CUDA)
+    add_definitions(-DUSE_CUDA=1)
+    message(STATUS "CUDA found: ${CUDA_VERSION}")
+else()
+    add_definitions(-DUSE_CUDA=0)
+    message(STATUS "CUDA not found, GPU acceleration disabled")
+endif()
+
+# ONNX Runtime
+find_package(onnxruntime QUIET)
+if(onnxruntime_FOUND)
+    add_definitions(-DUSE_ONNX=1)
+    message(STATUS "ONNX Runtime found")
+else()
+    add_definitions(-DUSE_ONNX=0)
+    message(STATUS "ONNX Runtime not found, ONNX support disabled")
+endif()
+
+# PyTorch C++ API
+find_package(Torch QUIET)
+if(Torch_FOUND)
+    add_definitions(-DUSE_TORCH=1)
+    message(STATUS "PyTorch C++ API found: ${Torch_VERSION}")
+else()
+    add_definitions(-DUSE_TORCH=0)
+    message(STATUS "PyTorch C++ API not found, PyTorch support disabled")
+endif()
+
+# FetchContent for dependencies
+include(FetchContent)
+
+# Catch2 for testing
+FetchContent_Declare(
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.4.0
+)
+FetchContent_MakeAvailable(Catch2)
+
+# nlohmann/json
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.2
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
+# libcurl
+find_package(CURL REQUIRED)
+
+# Source files
+set(ESX_SOURCES
+    src/main.cpp
+    src/parser.cpp
+    src/error_handler.cpp
+    src/onnx_export.cpp
+    src/repl.cpp
+)
+
+set(ESX_HEADERS
+    src/ast.hpp
     src/config.hpp
+    src/parser.hpp
+    src/interpreter.hpp
     src/tensor.hpp
-    src/model.hpp
     src/dataset.hpp
     src/distributed.hpp
-    src/interpreter.hpp
-    src/ast.hpp
-    src/parser.hpp
+    src/model.hpp
+    src/runtime.hpp
     src/printer.hpp
-    src/main.cpp
+    src/error_handler.hpp
+    src/onnx_export.hpp
+    src/repl.hpp
 )
-target_include_directories(esx PRIVATE 
-    ${Boost_INCLUDE_DIRS} 
-    ${EIGEN_INCLUDE_DIR} 
-    ${onnxruntime_INCLUDE_DIRS} 
-    ${OpenMPI_INCLUDE_DIRS} 
-    ${Torch_INCLUDE_DIRS} 
-    ${CURL_INCLUDE_DIRS}
-    src
+
+# Main executable
+add_executable(esx ${ESX_SOURCES} ${ESX_HEADERS})
+
+# Link libraries
+target_link_libraries(esx
+    Boost::system
+    Boost::filesystem
+    Eigen3::Eigen
+    Threads::Threads
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
 )
-target_link_libraries(esx PRIVATE 
-    ${Boost_LIBRARIES} 
-    OpenMP::OpenMP_CXX 
-    onnxruntime::onnxruntime 
-    ${OpenMPI_LIBRARIES} 
-    ${Torch_LIBRARIES} 
-    ${CURL_LIBRARIES}
-)
-if(USE_CUDA)
-    target_link_libraries(esx PRIVATE ${CUBLAS_LIBRARY} ${NCCL_LIBRARY})
-endif()
-if(TensorFlow_FOUND)
-    target_link_libraries(esx PRIVATE TensorFlow::TensorFlow)
+
+if(MPI_CXX_FOUND)
+    target_link_libraries(esx MPI::MPI_CXX)
 endif()
 
-if(BUILD_TESTS)
-    add_executable(test_esx tests/test_esx.cpp)
-    target_include_directories(test_esx PRIVATE 
-        ${Boost_INCLUDE_DIRS} 
-        ${EIGEN_INCLUDE_DIR} 
-        ${onnxruntime_INCLUDE_DIRS} 
-        ${OpenMPI_INCLUDE_dirs} 
-        ${Torch_INCLUDE_DIRS} 
-        ${CURL_INCLUDE_DIRS}
-        src
+if(Torch_FOUND)
+    target_link_libraries(esx ${TORCH_LIBRARIES})
+    target_compile_definitions(esx PRIVATE TORCH_API_INCLUDE_EXTRA_H)
+endif()
+
+if(onnxruntime_FOUND)
+    target_link_libraries(esx onnxruntime::onnxruntime)
+endif()
+
+# Compiler definitions
+target_compile_definitions(esx PRIVATE
+    ESX_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    ESX_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    ESX_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    ESX_VERSION_STRING="${PROJECT_VERSION}"
+)
+
+# Tests
+add_executable(test_esx tests/test_esx.cpp ${ESX_HEADERS})
+target_link_libraries(test_esx
+    Boost::system
+    Boost::filesystem
+    Eigen3::Eigen
+    Threads::Threads
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+    Catch2::Catch2WithMain
+)
+
+if(MPI_CXX_FOUND)
+    target_link_libraries(test_esx MPI::MPI_CXX)
+endif()
+
+if(Torch_FOUND)
+    target_link_libraries(test_esx ${TORCH_LIBRARIES})
+endif()
+
+# Benchmarks
+add_executable(benchmark benchmarks/benchmark.cpp ${ESX_HEADERS})
+target_link_libraries(benchmark
+    Boost::system
+    Boost::filesystem
+    Eigen3::Eigen
+    Threads::Threads
+    CURL::libcurl
+    nlohmann_json::nlohmann_json
+)
+
+if(MPI_CXX_FOUND)
+    target_link_libraries(benchmark MPI::MPI_CXX)
+endif()
+
+if(Torch_FOUND)
+    target_link_libraries(benchmark ${TORCH_LIBRARIES})
+endif()
+
+# Examples
+file(GLOB ESX_EXAMPLES "examples/*.esx")
+foreach(example ${ESX_EXAMPLES})
+    get_filename_component(example_name ${example} NAME_WE)
+    add_custom_target(run_${example_name}
+        COMMAND esx ${example}
+        DEPENDS esx
+        COMMENT "Running example: ${example_name}"
     )
-    target_link_libraries(test_esx PRIVATE 
-        ${Boost_LIBRARIES} 
-        OpenMP::OpenMP_CXX 
-        onnxruntime::onnxruntime 
-        ${OpenMPI_LIBRARIES} 
-        ${Torch_LIBRARIES} 
-        ${CURL_LIBRARIES}
+endforeach()
+
+# Install targets
+install(TARGETS esx test_esx benchmark
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+install(FILES ${ESX_HEADERS}
+    DESTINATION include/esx
+)
+
+install(DIRECTORY examples/
+    DESTINATION share/esx/examples
+    FILES_MATCHING PATTERN "*.esx"
+)
+
+# CTest
+enable_testing()
+add_test(NAME esx_tests COMMAND test_esx)
+
+# Custom targets
+add_custom_target(run_tests
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    DEPENDS test_esx
+    COMMENT "Running all tests"
+)
+
+add_custom_target(run_benchmarks
+    COMMAND benchmark
+    DEPENDS benchmark
+    COMMENT "Running benchmarks"
+)
+
+add_custom_target(run_examples
+    DEPENDS run_train run_matmul run_distributed run_autonomic run_pretrained run_custom_losses
+    COMMENT "Running all examples"
+)
+
+# Documentation
+find_package(Doxygen QUIET)
+if(DOXYGEN_FOUND)
+    configure_file(${CMAKE_SOURCE_DIR}/doxyfile ${CMAKE_BINARY_DIR}/doxyfile @ONLY)
+    add_custom_target(docs
+        COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_BINARY_DIR}/doxyfile
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM
     )
-    if(TensorFlow_FOUND)
-        target_link_libraries(test_esx PRIVATE TensorFlow::TensorFlow)
-    endif()
-    if(USE_CUDA)
-        target_link_libraries(test_esx PRIVATE ${CUBLAS_LIBRARY} ${NCCL_LIBRARY})
-endif()
-    enable_testing()
-    add_test(NAME ESXTests COMMAND test_esx)
 endif()
 
-if(BUILD_DOCS)
-    find_package(Doxygen REQUIRED)
-    set(DOXYGEN_OUTPUT_DIRECTORY docs/api)
-    doxygen_add_docs(docs src ALL)
+# Package configuration
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+    EasiScriptXConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+configure_package_config_file(
+    ${CMAKE_SOURCE_DIR}/cmake/EasiScriptXConfig.cmake.in
+    ${CMAKE_BINARY_DIR}/EasiScriptXConfig.cmake
+    INSTALL_DESTINATION lib/cmake/EasiScriptX
+)
+
+install(FILES
+    ${CMAKE_BINARY_DIR}/EasiScriptXConfig.cmake
+    ${CMAKE_BINARY_DIR}/EasiScriptXConfigVersion.cmake
+    DESTINATION lib/cmake/EasiScriptX
+)
+
+# CPack for packaging
+include(CPack)
+set(CPACK_PACKAGE_NAME "EasiScriptX")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "EasiScriptX - AI/ML DSL")
+set(CPACK_PACKAGE_VENDOR "EasiScriptX Team")
+set(CPACK_PACKAGE_CONTACT "contact@easiscriptx.org")
+
+# Platform-specific settings
+if(WIN32)
+    set(CPACK_GENERATOR "ZIP;NSIS")
+elseif(APPLE)
+    set(CPACK_GENERATOR "ZIP;TGZ")
+else()
+    set(CPACK_GENERATOR "ZIP;TGZ;DEB;RPM")
 endif()
 
-install(TARGETS esx DESTINATION bin)
+# Print configuration summary
+message(STATUS "")
+message(STATUS "EasiScriptX Configuration Summary:")
+message(STATUS "  Version: ${PROJECT_VERSION}")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  MPI support: ${MPI_CXX_FOUND}")
+message(STATUS "  CUDA support: ${CUDA_FOUND}")
+message(STATUS "  ONNX support: ${onnxruntime_FOUND}")
+message(STATUS "  PyTorch support: ${Torch_FOUND}")
+message(STATUS "")

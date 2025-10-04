@@ -1,4 +1,26 @@
+// EasiScriptX Distributed Training Example
+// Demonstrates multi-GPU and multi-node training
+
+// Define model and data
+let model = tensor([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
+let train_data = tensor([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+
+// Multi-GPU training
 distribute(gpus: 2) {
-    train(mymodel, mnist, loss: ce, opt: adam(lr=0.001), epochs=5)
+    train(model, train_data, loss: ce, opt: adam(lr=0.001), epochs: 5, device: gpu)
 }
 
+// Pipeline parallelism
+pipeline_parallel(model, stages:2)
+
+// Heterogeneous scheduling
+schedule_heterogeneous(cpu:0.7, gpu:0.3)
+
+// Energy-aware training
+energy_aware(model, max_power:100)
+
+// Memory optimization
+memory_broker(model, max_mem:8, strategy:zeRO)
+
+// Gradient checkpointing for memory efficiency
+checkpoint(model, segments:4)

@@ -3,44 +3,171 @@
 
 /**
  * @file config.hpp
- * @brief Configuration macros for EasiScriptX (ESX).
- * @details Defines build-time configuration options for enabling/disabling features
- * and optimizing performance for CPU or GPU execution.
+ * @brief Configuration flags and build options for EasiScriptX (ESX).
+ * @details Defines compile-time configuration options for enabling/disabling
+ * various features and backends.
  */
 
-/// @brief Enables CUDA support for GPU acceleration (set via CMake -DUSE_CUDA=ON).
-#ifndef USE_CUDA
-#define USE_CUDA 0
-#endif
-
-/// @brief Enables MPI support for multi-node distributed training (set via CMake -DUSE_MPI=ON).
-#ifndef USE_MPI
-#define USE_MPI 1
-#endif
-
-/// @brief Enables ONNX Runtime support for pretrained model loading.
+// Backend support flags
 #define USE_ONNX 1
+#define USE_TENSORFLOW 0
+#define USE_CUDA 0
+#define USE_MPI 1
+#define USE_NCCL 0
 
-/// @brief Enables TensorFlow support for .pb model loading (via ONNX conversion).
-#define USE_TENSORFLOW 1
+// Precision support
+#define USE_BF16 1
+#define USE_FP16 1
+#define USE_FP32 1
 
-/// @brief Enables profiling for execution time and memory usage.
+// Optimization flags
 #define USE_PROFILING 1
+#define USE_ENERGY_TRACKING 1
+#define USE_MEMORY_OPTIMIZATION 1
 
-/// @brief Enables debug mode for AST printing and detailed logging.
-#define DEBUG_MODE 0
+// Research features
+#define USE_LORA 1
+#define USE_QUANTIZATION 1
+#define USE_SPECULATIVE_DECODING 1
+#define USE_PATTERN_RECOGNITION 1
+#define USE_GRADIENT_CHECKPOINTING 1
+#define USE_KERNEL_FUSION 1
+#define USE_SPARSE_ATTENTION 1
 
-/// @brief Tile size for GPU matrix operations (optimized for CUDA).
-#define GPU_TILE_SIZE 128
+// Performance tuning
+#define DEFAULT_BATCH_SIZE 32
+#define MAX_MEMORY_GB 8
+#define DEFAULT_LEARNING_RATE 0.001
+#define DEFAULT_EPOCHS 10
 
-/// @brief Tile size for CPU matrix operations (optimized for Eigen/SIMD).
-#define CPU_TILE_SIZE 64
+// Error handling
+#define ENABLE_DETAILED_ERRORS 1
+#define ENABLE_STACK_TRACES 0
 
-/// @brief Selects tile size based on CUDA availability.
-#if USE_CUDA
-#define MAX_TILE_SIZE GPU_TILE_SIZE
+// Debugging
+#define DEBUG_PARSER 0
+#define DEBUG_INTERPRETER 0
+#define DEBUG_TENSOR_OPS 0
+
+// Version information
+#define ESX_VERSION_MAJOR 1
+#define ESX_VERSION_MINOR 0
+#define ESX_VERSION_PATCH 0
+#define ESX_VERSION_STRING "1.0.0"
+
+// Platform detection
+#ifdef _WIN32
+    #define ESX_PLATFORM_WINDOWS 1
+    #define ESX_PLATFORM_LINUX 0
+    #define ESX_PLATFORM_MACOS 0
+#elif __APPLE__
+    #define ESX_PLATFORM_WINDOWS 0
+    #define ESX_PLATFORM_LINUX 0
+    #define ESX_PLATFORM_MACOS 1
 #else
-#define MAX_TILE_SIZE CPU_TILE_SIZE
+    #define ESX_PLATFORM_WINDOWS 0
+    #define ESX_PLATFORM_LINUX 1
+    #define ESX_PLATFORM_MACOS 0
 #endif
+
+// Architecture detection
+#ifdef __aarch64__
+    #define ESX_ARCH_ARM64 1
+    #define ESX_ARCH_X86_64 0
+#else
+    #define ESX_ARCH_ARM64 0
+    #define ESX_ARCH_X86_64 1
+#endif
+
+// Compiler detection
+#ifdef __GNUC__
+    #define ESX_COMPILER_GCC 1
+    #define ESX_COMPILER_CLANG 0
+    #define ESX_COMPILER_MSVC 0
+#elif __clang__
+    #define ESX_COMPILER_GCC 0
+    #define ESX_COMPILER_CLANG 1
+    #define ESX_COMPILER_MSVC 0
+#elif _MSC_VER
+    #define ESX_COMPILER_GCC 0
+    #define ESX_COMPILER_CLANG 0
+    #define ESX_COMPILER_MSVC 1
+#else
+    #define ESX_COMPILER_GCC 0
+    #define ESX_COMPILER_CLANG 0
+    #define ESX_COMPILER_MSVC 0
+#endif
+
+// Feature availability checks
+#if USE_CUDA && !defined(__CUDACC__)
+    #undef USE_CUDA
+    #define USE_CUDA 0
+#endif
+
+#if USE_MPI && !defined(MPI_VERSION)
+    #undef USE_MPI
+    #define USE_MPI 0
+#endif
+
+#if USE_NCCL && !USE_CUDA
+    #undef USE_NCCL
+    #define USE_NCCL 0
+#endif
+
+// Performance optimization macros
+#if ESX_COMPILER_GCC || ESX_COMPILER_CLANG
+    #define ESX_LIKELY(x) __builtin_expect(!!(x), 1)
+    #define ESX_UNLIKELY(x) __builtin_expect(!!(x), 0)
+    #define ESX_FORCE_INLINE __attribute__((always_inline)) inline
+#elif ESX_COMPILER_MSVC
+    #define ESX_LIKELY(x) (x)
+    #define ESX_UNLIKELY(x) (x)
+    #define ESX_FORCE_INLINE __forceinline
+#else
+    #define ESX_LIKELY(x) (x)
+    #define ESX_UNLIKELY(x) (x)
+    #define ESX_FORCE_INLINE inline
+#endif
+
+// Memory alignment
+#define ESX_ALIGN_64 __attribute__((aligned(64)))
+#define ESX_ALIGN_32 __attribute__((aligned(32)))
+#define ESX_ALIGN_16 __attribute__((aligned(16)))
+
+// Assertion macros
+#if ENABLE_DETAILED_ERRORS
+    #include <cassert>
+    #define ESX_ASSERT(condition, message) assert((condition) && (message))
+#else
+    #define ESX_ASSERT(condition, message) ((void)0)
+#endif
+
+// Logging macros
+#if DEBUG_PARSER || DEBUG_INTERPRETER || DEBUG_TENSOR_OPS
+    #include <iostream>
+    #define ESX_DEBUG(module, message) std::cout << "[" << module << "] " << message << std::endl
+#else
+    #define ESX_DEBUG(module, message) ((void)0)
+#endif
+
+// Utility macros
+#define ESX_UNUSED(x) ((void)(x))
+#define ESX_ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+
+// Feature test macros
+#define ESX_HAS_FEATURE(feature) (ESX_HAS_##feature)
+#define ESX_HAS_ONNX USE_ONNX
+#define ESX_HAS_CUDA USE_CUDA
+#define ESX_HAS_MPI USE_MPI
+#define ESX_HAS_NCCL USE_NCCL
+#define ESX_HAS_BF16 USE_BF16
+#define ESX_HAS_FP16 USE_FP16
+#define ESX_HAS_LORA USE_LORA
+#define ESX_HAS_QUANTIZATION USE_QUANTIZATION
+#define ESX_HAS_SPECULATIVE_DECODING USE_SPECULATIVE_DECODING
+#define ESX_HAS_PATTERN_RECOGNITION USE_PATTERN_RECOGNITION
+#define ESX_HAS_GRADIENT_CHECKPOINTING USE_GRADIENT_CHECKPOINTING
+#define ESX_HAS_KERNEL_FUSION USE_KERNEL_FUSION
+#define ESX_HAS_SPARSE_ATTENTION USE_SPARSE_ATTENTION
 
 #endif // ESX_CONFIG_HPP

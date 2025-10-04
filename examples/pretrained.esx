@@ -1,1 +1,33 @@
-let model = load_pretrained("resnet50");
+// EasiScriptX Pretrained Models Example
+// Demonstrates loading and using pretrained models
+
+// Load pretrained ResNet50 model
+let resnet50 = load_pretrained("resnet50")
+
+// Switch between frameworks
+switch_framework(pytorch, resnet50.pt)
+
+// Apply LoRA for fine-tuning
+let lora_resnet = lora(resnet50, rank:8)
+
+// Use mixed precision for efficiency
+let mp_resnet = mixed_precision(lora_resnet, bf16)
+
+// Quantize for deployment
+quantize(mp_resnet, bits:8, method:ptq)
+
+// Apply pruning for model compression
+prune(mp_resnet, ratio:0.3)
+
+// Memory optimization for large models
+memory_broker(mp_resnet, max_mem:16, strategy:zeRO)
+
+// Gradient checkpointing for training
+checkpoint(mp_resnet, segments:8)
+
+// Train with pretrained weights
+let train_data = tensor([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
+train(mp_resnet, train_data, loss: ce, opt: adam(lr=0.0001), epochs: 5, device: gpu)
+
+// Track experiment with MLflow
+track_experiment(mlflow, run123)
