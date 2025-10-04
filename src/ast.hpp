@@ -329,6 +329,94 @@ struct TrackExperimentStmt : Stmt {
 };
 
 /**
+ * @brief Memory Broker statement for GPU memory optimization (e.g., memory_broker(model, max_mem=8GB, strategy=zeRO)).
+ */
+struct MemoryBrokerStmt : Stmt {
+    std::shared_ptr<Expr> model;
+    double max_mem; // in GB
+    std::string strategy; // "zeRO", "offload"
+    MemoryBrokerStmt(const Location& loc, std::shared_ptr<Expr> model, double max_mem, const std::string& strategy)
+        : Stmt(loc), model(model), max_mem(max_mem), strategy(strategy) {}
+    void validate() const override {
+        if (max_mem <= 0) throw std::runtime_error("Invalid max memory at line " + std::to_string(loc.line));
+        if (strategy != "zeRO" && strategy != "offload") throw std::runtime_error("Invalid strategy at line " + std::to_string(loc.line));
+        model->validate();
+    }
+};
+
+/**
+ * @brief Quantization statement for model compression (e.g., quantize(model, bits=8, method=ptq)).
+ */
+struct QuantizeStmt : Stmt {
+    std::shared_ptr<Expr> model;
+    int bits;
+    std::string method; // "ptq", "qat"
+    QuantizeStmt(const Location& loc, std::shared_ptr<Expr> model, int bits, const std::string& method)
+        : Stmt(loc), model(model), bits(bits), method(method) {}
+    void validate() const override {
+        if (bits != 8 && bits != 4) throw std::runtime_error("Invalid quantization bits at line " + std::to_string(loc.line));
+        if (method != "ptq" && method != "qat") throw std::runtime_error("Invalid quantization method at line " + std::to_string(loc.line));
+        model->validate();
+    }
+};
+
+/**
+ * @brief Speculative Decoding statement for faster LLM inference (e.g., speculative_decode(model, draft_model, max_tokens=100)).
+ */
+struct SpeculativeDecodeStmt : Stmt {
+    std::shared_ptr<Expr> model, draft_model;
+    int max_tokens;
+    SpeculativeDecodeStmt(const Location& loc, std::shared_ptr<Expr> model, std::shared_ptr<Expr> draft_model, int max_tokens)
+        : Stmt(loc), model(model), draft_model(draft_model), max_tokens(max_tokens) {}
+    void validate() const override {
+        if (max_tokens <= 0) throw std::runtime_error("Invalid max tokens at line " + std::to_string(loc.line));
+        model->validate();
+        draft_model->validate();
+    }
+};
+
+/**
+ * @brief Pattern Recognition statement for ARC-AGI2-inspired reasoning (e.g., pattern_recognize(dataset, rules=geometric)).
+ */
+struct PatternRecognizeStmt : Stmt {
+    std::shared_ptr<Expr> dataset;
+    std::string rules; // "geometric", "arithmetic"
+    PatternRecognizeStmt(const Location& loc, std::shared_ptr<Expr> dataset, const std::string& rules)
+        : Stmt(loc), dataset(dataset), rules(rules) {}
+    void validate() const override {
+        if (rules != "geometric" && rules != "arithmetic") throw std::runtime_error("Invalid rules at line " + std::to_string(loc.line));
+        dataset->validate();
+    }
+};
+
+/**
+ * @brief Gradient Checkpointing statement for memory reduction (e.g., checkpoint(model, segments=4)).
+ */
+struct CheckpointStmt : Stmt {
+    std::shared_ptr<Expr> model;
+    int segments;
+    CheckpointStmt(const Location& loc, std::shared_ptr<Expr> model, int segments)
+        : Stmt(loc), model(model), segments(segments) {}
+    void validate() const override {
+        if (segments <= 0) throw std::runtime_error("Invalid segments at line " + std::to_string(loc.line));
+        model->validate();
+    }
+};
+
+/**
+ * @brief Fused Matrix Multiplication with ReLU expression for kernel fusion (e.g., fused_matmul_relu(a, b)).
+ */
+struct FusedMatmulReluExpr : Expr {
+    std::shared_ptr<Expr> left, right;
+    FusedMatmulReluExpr(const Location& loc, std::shared_ptr<Expr> left, std::shared_ptr<Expr> right)
+        : Expr(loc), left(left), right(right) {}
+    void validate() const override {
+        left->validate();
+        right->validate();
+    }
+};
+
+/**
  * @brief Program containing all statements.
  */
 struct Program {

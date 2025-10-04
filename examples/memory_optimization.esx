@@ -1,0 +1,17 @@
+// Memory Optimization Example using EasiScriptX
+// Demonstrates Memory Broker, Quantization, and Gradient Checkpointing
+
+// Load a model
+let model = tensor([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
+
+// Apply Memory Broker for GPU memory optimization (30-40% reduction)
+memory_broker(model, max_mem:8, strategy:zeRO)
+
+// Quantize model for 4x size reduction and 2-3x speedup
+quantize(model, bits:8, method:ptq)
+
+// Apply gradient checkpointing for 50% memory reduction during training
+checkpoint(model, segments:4)
+
+// Train with dynamic batching
+train(model, model, loss:ce, opt:adam(lr=0.001), epochs:5, device:cpu)

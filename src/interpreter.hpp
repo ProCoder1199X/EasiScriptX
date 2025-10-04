@@ -11,6 +11,8 @@
 #include <string>
 #include <fstream>
 #include <curl/curl.h>
+#include <chrono>
+#include <filesystem>
 
 /**
  * @file interpreter.hpp
@@ -73,7 +75,15 @@ private:
             auto q = execute_expr(attn->q);
             auto k = execute_expr(attn->k);
             auto v = execute_expr(attn->v);
-            return q.flash_attention(k, v, attn->heads, attn->dim);
+            
+            // Performance profiling for FlashAttention
+            auto start = std::chrono::high_resolution_clock::now();
+            auto result = q.flash_attention(k, v, attn->heads, attn->dim);
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+            std::cout << "FlashAttention time: " << duration.count() << "us" << std::endl;
+            
+            return result;
         }
         if (auto* lora = dynamic_cast<ast::LoRAExpr*>(expr.get())) {
             auto model = execute_expr(lora->model);
@@ -84,6 +94,11 @@ private:
             auto model = execute_expr(mp->model);
             model.to_precision(mp->precision);
             return model;
+        }
+        if (auto* fused = dynamic_cast<ast::FusedMatmulReluExpr*>(expr.get())) {
+            auto left = execute_expr(fused->left);
+            auto right = execute_expr(fused->right);
+            return left.fused_matmul_relu(right);
         }
         throw std::runtime_error("Unknown expression at line " + std::to_string(expr->loc.line));
     }
@@ -108,11 +123,19 @@ private:
             std::cout << "Training model with " << train->loss << " loss, "
                       << train->opt << " optimizer on " << train->device
                       << " for " << train->epochs << " epochs" << std::endl;
-            // Mock training loop
+            
+            // Dynamic batching based on memory availability
+            int batch_size = std::min(32, static_cast<int>(8.0 / (model.torch_tensor.numel() * 1e-9))); // Dynamic batch size
+            
+            // Mock training loop with profiling
+            auto training_start = std::chrono::high_resolution_clock::now();
             for (int i = 0; i < train->epochs; ++i) {
-                auto batch = datasets["current"].next_batch(32);
+                auto batch = datasets["current"].next_batch(batch_size);
                 batch.energy_usage += batch.torch_tensor.numel() * 0.0001; // Mock energy
             }
+            auto training_end = std::chrono::high_resolution_clock::now();
+            auto training_duration = std::chrono::duration_cast<std::chrono::microseconds>(training_end - training_start);
+            std::cout << "Training completed in " << training_duration.count() << "us" << std::endl;
         } else if (auto* pp = dynamic_cast<ast::PipelineParallelStmt*>(stmt.get())) {
             auto model = execute_expr(pp->model);
             Distributed::init_multi_gpu(pp->stages);
@@ -134,6 +157,10 @@ private:
             model.energy_usage += ea->max_power * 0.001; // Mock RAPL
             std::cout << "Energy-aware scheduling with max power " << ea->max_power << "W" << std::endl;
         } else if (auto* sf = dynamic_cast<ast::SwitchFrameworkStmt*>(stmt.get())) {
+            // Enhanced error handling for model paths
+            if (!std::filesystem::exists(sf->model_path)) {
+                throw std::runtime_error("Model file " + sf->model_path + " not found at line " + std::to_string(sf->loc.line));
+            }
             if (sf->framework == "pytorch") {
                 try {
                     auto model = torch::jit::load(sf->model_path);
@@ -155,6 +182,28 @@ private:
                 curl_easy_cleanup(curl);
             }
             std::cout << "Tracking experiment with MLflow, run ID " << te->run_id << std::endl;
+        } else if (auto* mb = dynamic_cast<ast::MemoryBrokerStmt*>(stmt.get())) {
+            auto model = execute_expr(mb->model);
+            model.apply_memory_broker(mb->max_mem, mb->strategy);
+            std::cout << "Memory broker applied: max_mem=" << mb->max_mem << "GB, strategy=" << mb->strategy << std::endl;
+        } else if (auto* q = dynamic_cast<ast::QuantizeStmt*>(stmt.get())) {
+            auto model = execute_expr(q->model);
+            model.quantize(q->bits, q->method);
+            std::cout << "Quantized model to " << q->bits << " bits using " << q->method << std::endl;
+        } else if (auto* sd = dynamic_cast<ast::SpeculativeDecodeStmt*>(stmt.get())) {
+            auto model = execute_expr(sd->model);
+            auto draft = execute_expr(sd->draft_model);
+            // Mock speculative decoding (full implementation in v1.1 with CUDA)
+            std::cout << "Speculative decoding with max_tokens=" << sd->max_tokens << std::endl;
+        } else if (auto* pr = dynamic_cast<ast::PatternRecognizeStmt*>(stmt.get())) {
+            auto dataset = execute_expr(pr->dataset);
+            datasets["current"].data.push_back(dataset);
+            datasets["current"].apply_pattern(pr->rules);
+            std::cout << "Pattern recognition applied with rules=" << pr->rules << std::endl;
+        } else if (auto* cp = dynamic_cast<ast::CheckpointStmt*>(stmt.get())) {
+            auto model = execute_expr(cp->model);
+            // Mock gradient checkpointing (full implementation in v1.1)
+            std::cout << "Gradient checkpointing with segments=" << cp->segments << std::endl;
         } else {
             throw std::runtime_error("Unknown statement at line " + std::to_string(stmt->loc.line));
         }

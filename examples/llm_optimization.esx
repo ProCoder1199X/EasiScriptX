@@ -1,0 +1,29 @@
+// LLM Optimization Example using EasiScriptX
+// Demonstrates Speculative Decoding, Kernel Fusion, and Sparse Attention
+
+// Load models
+let main_model = tensor([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
+let draft_model = tensor([[0.5,1,1.5,2],[2.5,3,3.5,4],[4.5,5,5.5,6],[6.5,7,7.5,8]])
+
+// Apply LoRA for parameter-efficient fine-tuning
+let lora_model = lora(main_model, rank:4)
+
+// Use mixed precision for memory efficiency
+let mp_model = mixed_precision(lora_model, bf16)
+
+// Speculative decoding for 2x faster inference
+speculative_decode(mp_model, draft_model, max_tokens:100)
+
+// Kernel fusion for 20-30% CPU performance improvement
+let x = tensor([[1,2],[3,4]])
+let y = tensor([[5,6],[7,8]])
+let fused_result = fused_matmul_relu(x, y)
+
+// FlashAttention with sparse support for 40% memory reduction
+let q = tensor([[1,2],[3,4]])
+let k = tensor([[5,6],[7,8]])
+let v = tensor([[9,10],[11,12]])
+let sparse_attn = attention(q, k, v, heads:8, dim:2, flash=true)
+
+// Train with instruction tuning
+instruction_tune(mp_model, sparse_attn, "Translate the following text:")

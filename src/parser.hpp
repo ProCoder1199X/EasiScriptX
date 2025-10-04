@@ -34,13 +34,15 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
         attention_expr = lit("attention") >> '(' >> expr >> ',' >> expr >> ',' >> expr >> ',' >> lit("heads:") >> int_ >> ',' >> lit("dim:") >> int_ >> -(',' >> lit("flash=true")) >> ')';
         lora_expr = lit("lora") >> '(' >> expr >> ',' >> lit("rank:") >> int_ >> ')';
         mixed_precision_expr = lit("mixed_precision") >> '(' >> expr >> ',' >> (lit("bf16") | lit("fp16")) >> ')';
+        fused_matmul_relu_expr = lit("fused_matmul_relu") >> '(' >> expr >> ',' >> expr >> ')';
         expr = ident [qi::_val = phoenix::new_<ast::IdentExpr>(qi::_1, qi::_2)] |
                tensor_lit [qi::_val = phoenix::new_<ast::TensorLitExpr>(qi::_1, qi::_2)] |
                matmul_expr [qi::_val = phoenix::new_<ast::MatmulExpr>(qi::_1, qi::_2, qi::_3)] |
                conv2d_expr [qi::_val = phoenix::new_<ast::Conv2dExpr>(qi::_1, qi::_2, qi::_3, qi::_4, qi::_5)] |
                attention_expr [qi::_val = phoenix::new_<ast::AttentionExpr>(qi::_1, qi::_2, qi::_3, qi::_4, qi::_5, qi::_6, qi::_7)] |
                lora_expr [qi::_val = phoenix::new_<ast::LoRAExpr>(qi::_1, qi::_2, qi::_3)] |
-               mixed_precision_expr [qi::_val = phoenix::new_<ast::MixedPrecisionExpr>(qi::_1, qi::_2, qi::_3)];
+               mixed_precision_expr [qi::_val = phoenix::new_<ast::MixedPrecisionExpr>(qi::_1, qi::_2, qi::_3)] |
+               fused_matmul_relu_expr [qi::_val = phoenix::new_<ast::FusedMatmulReluExpr>(qi::_1, qi::_2, qi::_3)];
 
         let_stmt = lit("let") >> ident >> '=' >> expr;
         train_stmt = lit("train") >> '(' >> expr >> ',' >> expr >> ',' >> lit("loss:") >> (lit("ce") | lit("mse")) >>
@@ -53,6 +55,11 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
         energy_aware_stmt = lit("energy_aware") >> '(' >> expr >> ',' >> lit("max_power:") >> double_ >> ')';
         switch_framework_stmt = lit("switch_framework") >> '(' >> (lit("pytorch") | lit("tensorflow") | lit("jax")) >> ',' >> lexeme[*(char_ - ')')] >> ')';
         track_experiment_stmt = lit("track_experiment") >> '(' >> lit("mlflow") >> ',' >> lexeme[*(char_ - ')')] >> ')';
+        memory_broker_stmt = lit("memory_broker") >> '(' >> expr >> ',' >> lit("max_mem:") >> double_ >> ',' >> lit("strategy:") >> (lit("zeRO") | lit("offload")) >> ')';
+        quantize_stmt = lit("quantize") >> '(' >> expr >> ',' >> lit("bits:") >> int_ >> ',' >> lit("method:") >> (lit("ptq") | lit("qat")) >> ')';
+        speculative_decode_stmt = lit("speculative_decode") >> '(' >> expr >> ',' >> expr >> ',' >> lit("max_tokens:") >> int_ >> ')';
+        pattern_recognize_stmt = lit("pattern_recognize") >> '(' >> expr >> ',' >> lit("rules:") >> (lit("geometric") | lit("arithmetic")) >> ')';
+        checkpoint_stmt = lit("checkpoint") >> '(' >> expr >> ',' >> lit("segments:") >> int_ >> ')';
         stmt = let_stmt [qi::_val = phoenix::new_<ast::LetStmt>(qi::_1, qi::_2, qi::_3)] |
                train_stmt [qi::_val = phoenix::new_<ast::TrainStmt>(qi::_1, qi::_2, qi::_3, qi::_4, qi::_5, qi::_6, qi::_7, qi::_8)] |
                pipeline_parallel_stmt [qi::_val = phoenix::new_<ast::PipelineParallelStmt>(qi::_1, qi::_2, qi::_3)] |
@@ -61,7 +68,12 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
                heterogeneous_schedule_stmt [qi::_val = phoenix::new_<ast::HeterogeneousScheduleStmt>(qi::_1, qi::_2, qi::_3)] |
                energy_aware_stmt [qi::_val = phoenix::new_<ast::EnergyAwareStmt>(qi::_1, qi::_2, qi::_3)] |
                switch_framework_stmt [qi::_val = phoenix::new_<ast::SwitchFrameworkStmt>(qi::_1, qi::_2, qi::_3)] |
-               track_experiment_stmt [qi::_val = phoenix::new_<ast::TrackExperimentStmt>(qi::_1, qi::_2, qi::_3)];
+               track_experiment_stmt [qi::_val = phoenix::new_<ast::TrackExperimentStmt>(qi::_1, qi::_2, qi::_3)] |
+               memory_broker_stmt [qi::_val = phoenix::new_<ast::MemoryBrokerStmt>(qi::_1, qi::_2, qi::_3, qi::_4)] |
+               quantize_stmt [qi::_val = phoenix::new_<ast::QuantizeStmt>(qi::_1, qi::_2, qi::_3, qi::_4)] |
+               speculative_decode_stmt [qi::_val = phoenix::new_<ast::SpeculativeDecodeStmt>(qi::_1, qi::_2, qi::_3, qi::_4)] |
+               pattern_recognize_stmt [qi::_val = phoenix::new_<ast::PatternRecognizeStmt>(qi::_1, qi::_2, qi::_3)] |
+               checkpoint_stmt [qi::_val = phoenix::new_<ast::CheckpointStmt>(qi::_1, qi::_2, qi::_3)];
         program = *stmt;
     }
 
@@ -73,6 +85,7 @@ private:
     qi::rule<Iterator, ast::AttentionExpr(), qi::space_type> attention_expr;
     qi::rule<Iterator, ast::LoRAExpr(), qi::space_type> lora_expr;
     qi::rule<Iterator, ast::MixedPrecisionExpr(), qi::space_type> mixed_precision_expr;
+    qi::rule<Iterator, ast::FusedMatmulReluExpr(), qi::space_type> fused_matmul_relu_expr;
     qi::rule<Iterator, std::shared_ptr<ast::Expr>(), qi::space_type> expr;
     qi::rule<Iterator, ast::LetStmt(), qi::space_type> let_stmt;
     qi::rule<Iterator, ast::TrainStmt(), qi::space_type> train_stmt;
@@ -83,6 +96,11 @@ private:
     qi::rule<Iterator, ast::EnergyAwareStmt(), qi::space_type> energy_aware_stmt;
     qi::rule<Iterator, ast::SwitchFrameworkStmt(), qi::space_type> switch_framework_stmt;
     qi::rule<Iterator, ast::TrackExperimentStmt(), qi::space_type> track_experiment_stmt;
+    qi::rule<Iterator, ast::MemoryBrokerStmt(), qi::space_type> memory_broker_stmt;
+    qi::rule<Iterator, ast::QuantizeStmt(), qi::space_type> quantize_stmt;
+    qi::rule<Iterator, ast::SpeculativeDecodeStmt(), qi::space_type> speculative_decode_stmt;
+    qi::rule<Iterator, ast::PatternRecognizeStmt(), qi::space_type> pattern_recognize_stmt;
+    qi::rule<Iterator, ast::CheckpointStmt(), qi::space_type> checkpoint_stmt;
     qi::rule<Iterator, std::shared_ptr<ast::Stmt>(), qi::space_type> stmt;
     qi::rule<Iterator, ast::Program(), qi::space_type> program;
 };

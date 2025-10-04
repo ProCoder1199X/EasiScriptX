@@ -1,0 +1,20 @@
+// Pattern Recognition Example using EasiScriptX
+// Demonstrates ARC-AGI2-inspired pattern recognition
+
+// Load dataset
+let dataset = tensor([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
+
+// Apply geometric pattern recognition for spatial reasoning
+pattern_recognize(dataset, rules:geometric)
+
+// Apply arithmetic pattern recognition for numerical sequences
+pattern_recognize(dataset, rules:arithmetic)
+
+// Train model with pattern recognition
+train(dataset, dataset, loss:ce, opt:adam(lr=0.001), epochs:10, device:cpu)
+
+// Use heterogeneous scheduling for optimal resource utilization
+schedule_heterogeneous(cpu:0.7, gpu:0.3)
+
+// Energy-aware training
+energy_aware(dataset, max_power:100)

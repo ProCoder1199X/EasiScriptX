@@ -129,6 +129,45 @@ struct Dataset {
         prefetch.get(); // Ensure prefetch completes
         return Tensor(batch_data);
     }
+
+    /**
+     * @brief Applies pattern recognition rules for ARC-AGI2-inspired reasoning.
+     * @param rules Pattern recognition rules ("geometric", "arithmetic").
+     */
+    void apply_pattern(const std::string& rules) {
+        if (rules == "geometric") {
+            // Mock geometric pattern recognition
+            std::cout << "Applying geometric pattern recognition" << std::endl;
+            // In full implementation, would analyze spatial relationships, shapes, colors
+            for (auto& sample : data) {
+                // Apply geometric transformations based on detected patterns
+                if (!sample.data.empty() && sample.data[0].size() >= 4) {
+                    // Mock geometric pattern: rotate 90 degrees if pattern detected
+                    std::vector<std::vector<double>> rotated = sample.data;
+                    for (size_t i = 0; i < sample.data.size(); ++i) {
+                        for (size_t j = 0; j < sample.data[i].size(); ++j) {
+                            rotated[j][sample.data.size() - 1 - i] = sample.data[i][j];
+                        }
+                    }
+                    sample.data = rotated;
+                }
+            }
+        } else if (rules == "arithmetic") {
+            // Mock arithmetic pattern recognition
+            std::cout << "Applying arithmetic pattern recognition" << std::endl;
+            // In full implementation, would analyze numerical sequences, operations
+            for (auto& sample : data) {
+                if (!sample.data.empty() && sample.data[0].size() >= 2) {
+                    // Mock arithmetic pattern: apply sequence transformation
+                    for (auto& row : sample.data) {
+                        for (size_t i = 1; i < row.size(); ++i) {
+                            row[i] = row[i-1] + row[i]; // Simple arithmetic progression
+                        }
+                    }
+                }
+            }
+        }
+    }
 };
 
 } // namespace esx::runtime
