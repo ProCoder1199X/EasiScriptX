@@ -1,32 +1,20 @@
-# Sample ESX script for v1.0
-let model = tensor([[1,2],[3,4]])
-let dataset = tensor([[0.5,0.5],[0.7,0.3]])
+// EasiScriptX Training Example
+// Demonstrates basic model training with MNIST-like data
 
-# Framework interoperability
-switch_framework(pytorch, pretrained/model.pt)
+// Define a simple model
+let model = tensor([[1,2,3,4],[5,6,7,8],[9,10,11,12],[13,14,15,16]])
 
-# Parameter-efficient fine-tuning
+// Load training data (mock MNIST)
+let train_data = tensor([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+
+// Train the model
+train(model, train_data, loss: ce, opt: adam(lr=0.001), epochs: 10, device: cpu)
+
+// Apply LoRA for parameter-efficient fine-tuning
 let lora_model = lora(model, rank:4)
+
+// Use mixed precision for memory efficiency
 let mp_model = mixed_precision(lora_model, bf16)
 
-# Advanced attention
-let attn = attention(model, model, model, heads:8, dim:64, flash=true)
-
-# Training with LOMO optimizer
-train(mp_model, dataset, loss:ce, opt:lomo(lr=0.001), epochs:10, device:cpu)
-
-# Pipeline parallelism
-pipeline_parallel(mp_model, stages:2)
-
-# Instruction tuning and domain adaptation
-instruction_tune(mp_model, dataset, "Summarize text")
-adapt_domain(mp_model, scientific)
-
-# Heterogeneous scheduling
-schedule_heterogeneous(cpu:0.7, gpu:0.3)
-
-# Energy-aware scheduling
-energy_aware(mp_model, max_power:100)
-
-# Experiment tracking
-track_experiment(mlflow, run123)
+// Train with mixed precision
+train(mp_model, train_data, loss: ce, opt: adam(lr=0.001), epochs: 5, device: cpu)

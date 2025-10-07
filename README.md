@@ -224,7 +224,7 @@ fn custom_loss(pred, true_val) {
                  }
   ```
 ---
-
+For full setup, see `docs/BUILD.md`. If you prefer containers, see `docs/DOCKER.md`.
 
 - Memory Optimization
 
@@ -368,7 +368,7 @@ EasiScriptX delivers significant performance improvements:
 
 The CI/CD pipeline will automatically test your changes across multiple platforms.
 
-
+Quick links: `docs/syntax.md`, `docs/tutorials.md`, `docs/api_reference.md`, `docs/BUILD.md`.
 ### License
 EasiScriptX is licensed under the MIT License. See LICENSE.txt for details.
 

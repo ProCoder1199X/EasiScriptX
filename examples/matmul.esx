@@ -1,3 +1,31 @@
+// EasiScriptX Matrix Operations Example
+// Demonstrates various tensor operations and optimizations
+
+// Basic matrix multiplication
 let a = tensor([[1,2],[3,4]])
 let b = tensor([[5,6],[7,8]])
 let c = a @ b
+
+// Convolution operation
+let input = tensor([[1,2,3],[4,5,6],[7,8,9]])
+let kernel = tensor([[1,0],[0,1]])
+let conv_result = conv2d(input, kernel, stride:1, padding:0)
+
+// Attention mechanism with FlashAttention-2
+let q = tensor([[1,2],[3,4]])
+let k = tensor([[5,6],[7,8]])
+let v = tensor([[9,10],[11,12]])
+let attn_result = attention(q, k, v, heads:8, dim:2, flash=true)
+
+// Kernel fusion: fused matrix multiplication with ReLU
+let x = tensor([[1,2],[3,4]])
+let y = tensor([[5,6],[7,8]])
+let fused_result = fused_matmul_relu(x, y)
+
+// RNN operation
+let rnn_input = tensor([[1,2,3,4]])
+let rnn_result = rnn(rnn_input, hidden_size:128, layers:2)
+
+// Transformer block
+let transformer_input = tensor([[1,2,3,4],[5,6,7,8]])
+let transformer_result = transformer_block(transformer_input, heads:8, dim:4)

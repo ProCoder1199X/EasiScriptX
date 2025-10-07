@@ -1,17 +1,9 @@
-#ifndef ESX_PARSER_HPP
-#define ESX_PARSER_HPP
-
+#include "parser.hpp"
 #include "ast.hpp"
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix.hpp>
-#include <string>
-
-/**
- * @file parser.hpp
- * @brief Parser for EasiScriptX (ESX) source code.
- * @details Uses Boost.Spirit to parse ESX syntax into AST nodes, supporting
- * tensor operations, training, LLM fine-tuning, and enterprise features.
- */
+#include <iostream>
+#include <fstream>
 
 namespace esx::parser {
 namespace qi = boost::spirit::qi;
@@ -27,6 +19,7 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
         using qi::char_;
         using qi::string;
 
+        // Basic grammar rules
         ident = lexeme[char_("a-zA-Z_") >> *char_("a-zA-Z0-9_")];
         tensor_lit = lit("tensor") >> '(' >> ('[' >> double_ % ',' >> ']') % ',' >> ')';
         matmul_expr = expr >> '@' >> expr;
@@ -35,7 +28,12 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
         lora_expr = lit("lora") >> '(' >> expr >> ',' >> lit("rank:") >> int_ >> ')';
         mixed_precision_expr = lit("mixed_precision") >> '(' >> expr >> ',' >> (lit("bf16") | lit("fp16")) >> ')';
         fused_matmul_relu_expr = lit("fused_matmul_relu") >> '(' >> expr >> ',' >> expr >> ')';
-        load_hf_expr = lit("load_hf") >> '(' >> lexeme[*(char_ - ')')] >> ')';
+        auto load_hf_kw = lit("load_hf") >> '(' >> lexeme[*(char_ - ')')] >> ')';
+        quantize_expr = lit("quantize") >> '(' >> expr >> ',' >> lit("bits:") >> int_ >> ',' >> lit("method:") >> (lit("ptq") | lit("qat")) >> ')';
+        prune_expr = lit("prune") >> '(' >> expr >> ',' >> lit("ratio:") >> double_ >> ')';
+        rnn_expr = lit("rnn") >> '(' >> expr >> ',' >> lit("hidden_size:") >> int_ >> ',' >> lit("layers:") >> int_ >> ')';
+        transformer_expr = lit("transformer_block") >> '(' >> expr >> ',' >> lit("heads:") >> int_ >> ',' >> lit("dim:") >> int_ >> ')';
+        
         expr = ident [qi::_val = phoenix::new_<ast::IdentExpr>(qi::_1, qi::_2)] |
                tensor_lit [qi::_val = phoenix::new_<ast::TensorLitExpr>(qi::_1, qi::_2)] |
                matmul_expr [qi::_val = phoenix::new_<ast::MatmulExpr>(qi::_1, qi::_2, qi::_3)] |
@@ -44,8 +42,13 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
                lora_expr [qi::_val = phoenix::new_<ast::LoRAExpr>(qi::_1, qi::_2, qi::_3)] |
                mixed_precision_expr [qi::_val = phoenix::new_<ast::MixedPrecisionExpr>(qi::_1, qi::_2, qi::_3)] |
                fused_matmul_relu_expr [qi::_val = phoenix::new_<ast::FusedMatmulReluExpr>(qi::_1, qi::_2, qi::_3)] |
-               load_hf_expr [qi::_val = phoenix::new_<ast::LoadHFExpr>(qi::_1, qi::_2)];
+               quantize_expr [qi::_val = phoenix::new_<ast::QuantizeExpr>(qi::_1, qi::_2, qi::_3, qi::_4)] |
+               prune_expr [qi::_val = phoenix::new_<ast::PruneExpr>(qi::_1, qi::_2, qi::_3)] |
+               rnn_expr [qi::_val = phoenix::new_<ast::RNNExpr>(qi::_1, qi::_2, qi::_3)] |
+               transformer_expr [qi::_val = phoenix::new_<ast::TransformerExpr>(qi::_1, qi::_2, qi::_3)] |
+               load_hf_kw [qi::_val = phoenix::new_<ast::LoadHFExpr>(qi::_1, qi::_2)];
 
+        // Statement rules
         let_stmt = lit("let") >> ident >> '=' >> expr;
         train_stmt = lit("train") >> '(' >> expr >> ',' >> expr >> ',' >> lit("loss:") >> (lit("ce") | lit("mse")) >>
                      ',' >> lit("opt:") >> (lit("adam") | lit("sgd") | lit("lomo")) >> '(' >> (ident >> '=' >> double_) % ',' >> ')' >>
@@ -62,7 +65,12 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
         speculative_decode_stmt = lit("speculative_decode") >> '(' >> expr >> ',' >> expr >> ',' >> lit("max_tokens:") >> int_ >> ')';
         pattern_recognize_stmt = lit("pattern_recognize") >> '(' >> expr >> ',' >> lit("rules:") >> (lit("geometric") | lit("arithmetic")) >> ')';
         checkpoint_stmt = lit("checkpoint") >> '(' >> expr >> ',' >> lit("segments:") >> int_ >> ')';
-        agent_tune_stmt = lit("agent_tune") >> '(' >> expr >> ',' >> lit("agents:") >> int_ >> ',' >> lit("target:") >> lexeme[*(char_ - ')')] >> ')';
+        distribute_stmt = lit("distribute") >> '(' >> lit("gpus:") >> int_ >> ')' >> '{' >> *stmt >> '}';
+        autonomic_stmt = lit("with") >> lit("autonomic") >> '{' >> *stmt >> '}';
+        model_stmt = lit("model") >> ident >> '{' >> *stmt >> '}';
+        custom_loss_stmt = lit("fn") >> ident >> '(' >> (ident % ',') >> ')' >> '{' >> lit("return") >> expr >> '}';
+        auto agent_tune_stmt_rule = lit("agent_tune") >> '(' >> expr >> ',' >> lit("agents:") >> int_ >> ',' >> lit("target:") >> lexeme[*(char_ - ')')] >> ')';
+        
         stmt = let_stmt [qi::_val = phoenix::new_<ast::LetStmt>(qi::_1, qi::_2, qi::_3)] |
                train_stmt [qi::_val = phoenix::new_<ast::TrainStmt>(qi::_1, qi::_2, qi::_3, qi::_4, qi::_5, qi::_6, qi::_7, qi::_8)] |
                pipeline_parallel_stmt [qi::_val = phoenix::new_<ast::PipelineParallelStmt>(qi::_1, qi::_2, qi::_3)] |
@@ -77,7 +85,12 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
                speculative_decode_stmt [qi::_val = phoenix::new_<ast::SpeculativeDecodeStmt>(qi::_1, qi::_2, qi::_3, qi::_4)] |
                pattern_recognize_stmt [qi::_val = phoenix::new_<ast::PatternRecognizeStmt>(qi::_1, qi::_2, qi::_3)] |
                checkpoint_stmt [qi::_val = phoenix::new_<ast::CheckpointStmt>(qi::_1, qi::_2, qi::_3)] |
-               agent_tune_stmt [qi::_val = phoenix::new_<ast::AgentTuneStmt>(qi::_1, qi::_2, qi::_3, qi::_4)];
+               distribute_stmt [qi::_val = phoenix::new_<ast::DistributeStmt>(qi::_1, qi::_2)] |
+               autonomic_stmt [qi::_val = phoenix::new_<ast::AutonomicStmt>(qi::_1)] |
+               model_stmt [qi::_val = phoenix::new_<ast::ModelStmt>(qi::_1, qi::_2)] |
+               custom_loss_stmt [qi::_val = phoenix::new_<ast::CustomLossStmt>(qi::_1, qi::_2, qi::_3)] |
+               agent_tune_stmt_rule [qi::_val = phoenix::new_<ast::AgentTuneStmt>(qi::_1, qi::_2, qi::_3, qi::_4)];
+        
         program = *stmt;
     }
 
@@ -90,7 +103,10 @@ private:
     qi::rule<Iterator, ast::LoRAExpr(), qi::space_type> lora_expr;
     qi::rule<Iterator, ast::MixedPrecisionExpr(), qi::space_type> mixed_precision_expr;
     qi::rule<Iterator, ast::FusedMatmulReluExpr(), qi::space_type> fused_matmul_relu_expr;
-    qi::rule<Iterator, ast::LoadHFExpr(), qi::space_type> load_hf_expr;
+    qi::rule<Iterator, ast::QuantizeExpr(), qi::space_type> quantize_expr;
+    qi::rule<Iterator, ast::PruneExpr(), qi::space_type> prune_expr;
+    qi::rule<Iterator, ast::RNNExpr(), qi::space_type> rnn_expr;
+    qi::rule<Iterator, ast::TransformerExpr(), qi::space_type> transformer_expr;
     qi::rule<Iterator, std::shared_ptr<ast::Expr>(), qi::space_type> expr;
     qi::rule<Iterator, ast::LetStmt(), qi::space_type> let_stmt;
     qi::rule<Iterator, ast::TrainStmt(), qi::space_type> train_stmt;
@@ -106,7 +122,10 @@ private:
     qi::rule<Iterator, ast::SpeculativeDecodeStmt(), qi::space_type> speculative_decode_stmt;
     qi::rule<Iterator, ast::PatternRecognizeStmt(), qi::space_type> pattern_recognize_stmt;
     qi::rule<Iterator, ast::CheckpointStmt(), qi::space_type> checkpoint_stmt;
-    qi::rule<Iterator, ast::AgentTuneStmt(), qi::space_type> agent_tune_stmt;
+    qi::rule<Iterator, ast::DistributeStmt(), qi::space_type> distribute_stmt;
+    qi::rule<Iterator, ast::AutonomicStmt(), qi::space_type> autonomic_stmt;
+    qi::rule<Iterator, ast::ModelStmt(), qi::space_type> model_stmt;
+    qi::rule<Iterator, ast::CustomLossStmt(), qi::space_type> custom_loss_stmt;
     qi::rule<Iterator, std::shared_ptr<ast::Stmt>(), qi::space_type> stmt;
     qi::rule<Iterator, ast::Program(), qi::space_type> program;
 };
@@ -133,5 +152,3 @@ ast::Program parse(const std::string& input) {
 }
 
 } // namespace esx::parser
-
-#endif // ESX_PARSER_HPP

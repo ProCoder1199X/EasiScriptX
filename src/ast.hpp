@@ -124,6 +124,20 @@ struct AttentionExpr : Expr {
 };
 
 /**
+ * @brief Load from Hugging Face Hub expression (e.g., load_hf("gpt2") or load_hf("dataset:imdb")).
+ */
+struct LoadHFExpr : Expr {
+    std::string handle; // model id or dataset id, optional prefix "dataset:"
+    LoadHFExpr(const Location& loc, const std::string& handle)
+        : Expr(loc), handle(handle) {}
+    void validate() const override {
+        if (handle.empty()) {
+            throw std::runtime_error("Empty Hugging Face handle at line " + std::to_string(loc.line));
+        }
+    }
+};
+
+/**
  * @brief LoRA expression for parameter-efficient fine-tuning (e.g., lora(model, rank=4)).
  */
 struct LoRAExpr : Expr {
@@ -168,8 +182,11 @@ struct Stmt : Node {
 struct LetStmt : Stmt {
     std::string name;
     std::shared_ptr<Expr> expr;
+    std::string type_annotation; // optional, e.g., "Tensor<f32,[2,3]>"
     LetStmt(const Location& loc, const std::string& name, std::shared_ptr<Expr> expr)
         : Stmt(loc), name(name), expr(expr) {}
+    LetStmt(const Location& loc, const std::string& name, const std::string& type_annotation, std::shared_ptr<Expr> expr)
+        : Stmt(loc), name(name), expr(expr), type_annotation(type_annotation) {}
     void validate() const override {
         if (name.empty()) {
             throw std::runtime_error("Empty variable name at line " + std::to_string(loc.line));
@@ -417,6 +434,141 @@ struct FusedMatmulReluExpr : Expr {
 };
 
 /**
+ * @brief Quantization expression (e.g., quantize(model, bits=8, method=ptq)).
+ */
+struct QuantizeExpr : Expr {
+    std::shared_ptr<Expr> model;
+    int bits;
+    std::string method; // "ptq", "qat"
+    QuantizeExpr(const Location& loc, std::shared_ptr<Expr> model, int bits, const std::string& method)
+        : Expr(loc), model(model), bits(bits), method(method) {}
+    void validate() const override {
+        if (bits != 8 && bits != 4) throw std::runtime_error("Invalid quantization bits at line " + std::to_string(loc.line));
+        if (method != "ptq" && method != "qat") throw std::runtime_error("Invalid quantization method at line " + std::to_string(loc.line));
+        model->validate();
+    }
+};
+
+/**
+ * @brief Pruning expression (e.g., prune(model, ratio=0.5)).
+ */
+struct PruneExpr : Expr {
+    std::shared_ptr<Expr> model;
+    double ratio;
+    PruneExpr(const Location& loc, std::shared_ptr<Expr> model, double ratio)
+        : Expr(loc), model(model), ratio(ratio) {}
+    void validate() const override {
+        if (ratio < 0.0 || ratio > 1.0) throw std::runtime_error("Invalid pruning ratio at line " + std::to_string(loc.line));
+        model->validate();
+    }
+};
+
+/**
+ * @brief RNN expression (e.g., rnn(input, hidden_size=128, layers=2)).
+ */
+struct RNNExpr : Expr {
+    std::shared_ptr<Expr> input;
+    int hidden_size, layers;
+    RNNExpr(const Location& loc, std::shared_ptr<Expr> input, int hidden_size, int layers)
+        : Expr(loc), input(input), hidden_size(hidden_size), layers(layers) {}
+    void validate() const override {
+        if (hidden_size <= 0 || layers <= 0) throw std::runtime_error("Invalid RNN parameters at line " + std::to_string(loc.line));
+        input->validate();
+    }
+};
+
+/**
+ * @brief Transformer block expression (e.g., transformer_block(input, heads=8, dim=64)).
+ */
+struct TransformerExpr : Expr {
+    std::shared_ptr<Expr> input;
+    int heads, dim;
+    TransformerExpr(const Location& loc, std::shared_ptr<Expr> input, int heads, int dim)
+        : Expr(loc), input(input), heads(heads), dim(dim) {}
+    void validate() const override {
+        if (heads <= 0 || dim <= 0) throw std::runtime_error("Invalid transformer parameters at line " + std::to_string(loc.line));
+        input->validate();
+    }
+};
+
+/**
+ * @brief Distributed training statement (e.g., distribute(gpus: 2) { ... }).
+ */
+struct DistributeStmt : Stmt {
+    int gpus;
+    std::vector<std::shared_ptr<Stmt>> body;
+    DistributeStmt(const Location& loc, int gpus, const std::vector<std::shared_ptr<Stmt>>& body)
+        : Stmt(loc), gpus(gpus), body(body) {}
+    void validate() const override {
+        if (gpus <= 0) throw std::runtime_error("Invalid GPU count at line " + std::to_string(loc.line));
+        for (const auto& stmt : body) {
+            stmt->validate();
+        }
+    }
+};
+
+/**
+ * @brief Autonomic optimization statement (e.g., with autonomic { ... }).
+ */
+struct AutonomicStmt : Stmt {
+    std::vector<std::shared_ptr<Stmt>> body;
+    AutonomicStmt(const Location& loc, const std::vector<std::shared_ptr<Stmt>>& body)
+        : Stmt(loc), body(body) {}
+    void validate() const override {
+        for (const auto& stmt : body) {
+            stmt->validate();
+        }
+    }
+};
+
+/**
+ * @brief Model definition statement (e.g., model mymodel { ... }).
+ */
+struct ModelStmt : Stmt {
+    std::string name;
+    std::vector<std::shared_ptr<Stmt>> body;
+    ModelStmt(const Location& loc, const std::string& name, const std::vector<std::shared_ptr<Stmt>>& body)
+        : Stmt(loc), name(name), body(body) {}
+    void validate() const override {
+        if (name.empty()) throw std::runtime_error("Empty model name at line " + std::to_string(loc.line));
+        for (const auto& stmt : body) {
+            stmt->validate();
+        }
+    }
+};
+
+/**
+ * @brief Custom loss function statement (e.g., fn custom_loss(pred, true_val) { return expr; }).
+ */
+struct CustomLossStmt : Stmt {
+    std::string name;
+    std::vector<std::string> params;
+    std::shared_ptr<Expr> body;
+    CustomLossStmt(const Location& loc, const std::string& name, const std::vector<std::string>& params, std::shared_ptr<Expr> body)
+        : Stmt(loc), name(name), params(params), body(body) {}
+    void validate() const override {
+        if (name.empty()) throw std::runtime_error("Empty function name at line " + std::to_string(loc.line));
+        body->validate();
+    }
+};
+
+/**
+ * @brief Agent-based tuning statement (e.g., agent_tune(model, agents: 4, target: "val_acc")).
+ */
+struct AgentTuneStmt : Stmt {
+    std::shared_ptr<Expr> model;
+    int agents;
+    std::string target_metric;
+    AgentTuneStmt(const Location& loc, std::shared_ptr<Expr> model, int agents, const std::string& target_metric)
+        : Stmt(loc), model(model), agents(agents), target_metric(target_metric) {}
+    void validate() const override {
+        if (agents <= 0) throw std::runtime_error("Invalid agents count at line " + std::to_string(loc.line));
+        if (target_metric.empty()) throw std::runtime_error("Empty target metric at line " + std::to_string(loc.line));
+        model->validate();
+    }
+};
+
+/**
  * @brief Program containing all statements.
  */
 struct Program {
@@ -425,6 +577,60 @@ struct Program {
         for (const auto& stmt : stmts) {
             stmt->validate();
         }
+    }
+};
+
+/**
+ * @brief Macro definition (e.g., macro bench { ... }).
+ */
+struct MacroDefStmt : Stmt {
+    std::string name;
+    std::vector<std::shared_ptr<Stmt>> body;
+    MacroDefStmt(const Location& loc, const std::string& name, const std::vector<std::shared_ptr<Stmt>>& body)
+        : Stmt(loc), name(name), body(body) {}
+    void validate() const override {
+        if (name.empty()) throw std::runtime_error("Empty macro name at line " + std::to_string(loc.line));
+        for (const auto& s : body) s->validate();
+    }
+};
+
+/**
+ * @brief Macro invocation (e.g., @bench { ... }).
+ */
+struct MacroInvokeStmt : Stmt {
+    std::string name;
+    std::vector<std::shared_ptr<Stmt>> body;
+    MacroInvokeStmt(const Location& loc, const std::string& name, const std::vector<std::shared_ptr<Stmt>>& body)
+        : Stmt(loc), name(name), body(body) {}
+    void validate() const override {
+        if (name.empty()) throw std::runtime_error("Empty macro name at line " + std::to_string(loc.line));
+        for (const auto& s : body) s->validate();
+    }
+};
+
+/**
+ * @brief Async block (e.g., async { ... }).
+ */
+struct AsyncStmt : Stmt {
+    std::vector<std::shared_ptr<Stmt>> body;
+    AsyncStmt(const Location& loc, const std::vector<std::shared_ptr<Stmt>>& body)
+        : Stmt(loc), body(body) {}
+    void validate() const override {
+        for (const auto& s : body) s->validate();
+    }
+};
+
+/**
+ * @brief Streaming dataset source (e.g., kafka("topic")).
+ */
+struct StreamDatasetExpr : Expr {
+    std::string source; // e.g., "kafka"
+    std::string spec;   // e.g., topic name
+    StreamDatasetExpr(const Location& loc, const std::string& source, const std::string& spec)
+        : Expr(loc), source(source), spec(spec) {}
+    void validate() const override {
+        if (source != "kafka") throw std::runtime_error("Unsupported stream source at line " + std::to_string(loc.line));
+        if (spec.empty()) throw std::runtime_error("Empty stream spec at line " + std::to_string(loc.line));
     }
 };
 
