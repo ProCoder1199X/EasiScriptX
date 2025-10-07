@@ -7,7 +7,11 @@ PROJECT_BRIEF          = "AI/ML Domain-Specific Language"
 PROJECT_LOGO           = 
 
 # Input and output directories
+<<<<<<< HEAD
 INPUT                  = src/ docs/
+=======
+INPUT                  = src/
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 OUTPUT_DIRECTORY       = docs/
 RECURSIVE              = YES
 
@@ -53,7 +57,11 @@ GENERATE_LATEX         = NO
 GENERATE_MAN           = NO
 
 # XML output
+<<<<<<< HEAD
 GENERATE_XML           = YES
+=======
+GENERATE_XML           = NO
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 
 # Preprocessor
 ENABLE_PREPROCESSING   = YES
@@ -79,7 +87,11 @@ CLASS_DIAGRAMS         = YES
 MSCGEN_PATH            = 
 DIA_PATH               = 
 HIDE_UNDOC_RELATIONS   = YES
+<<<<<<< HEAD
 HAVE_DOT               = YES
+=======
+HAVE_DOT               = NO
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 DOT_NUM_THREADS        = 0
 DOT_FONTNAME           = Helvetica
 DOT_FONTSIZE           = 10
@@ -113,4 +125,8 @@ GENERATE_LEGEND        = YES
 DOT_CLEANUP            = YES
 
 # Search engine
+<<<<<<< HEAD
 SEARCHENGINE           = YES
+=======
+SEARCHENGINE           = NO
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f

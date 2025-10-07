@@ -28,7 +28,10 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
         lora_expr = lit("lora") >> '(' >> expr >> ',' >> lit("rank:") >> int_ >> ')';
         mixed_precision_expr = lit("mixed_precision") >> '(' >> expr >> ',' >> (lit("bf16") | lit("fp16")) >> ')';
         fused_matmul_relu_expr = lit("fused_matmul_relu") >> '(' >> expr >> ',' >> expr >> ')';
+<<<<<<< HEAD
         auto load_hf_kw = lit("load_hf") >> '(' >> lexeme[*(char_ - ')')] >> ')';
+=======
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
         quantize_expr = lit("quantize") >> '(' >> expr >> ',' >> lit("bits:") >> int_ >> ',' >> lit("method:") >> (lit("ptq") | lit("qat")) >> ')';
         prune_expr = lit("prune") >> '(' >> expr >> ',' >> lit("ratio:") >> double_ >> ')';
         rnn_expr = lit("rnn") >> '(' >> expr >> ',' >> lit("hidden_size:") >> int_ >> ',' >> lit("layers:") >> int_ >> ')';
@@ -45,8 +48,12 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
                quantize_expr [qi::_val = phoenix::new_<ast::QuantizeExpr>(qi::_1, qi::_2, qi::_3, qi::_4)] |
                prune_expr [qi::_val = phoenix::new_<ast::PruneExpr>(qi::_1, qi::_2, qi::_3)] |
                rnn_expr [qi::_val = phoenix::new_<ast::RNNExpr>(qi::_1, qi::_2, qi::_3)] |
+<<<<<<< HEAD
                transformer_expr [qi::_val = phoenix::new_<ast::TransformerExpr>(qi::_1, qi::_2, qi::_3)] |
                load_hf_kw [qi::_val = phoenix::new_<ast::LoadHFExpr>(qi::_1, qi::_2)];
+=======
+               transformer_expr [qi::_val = phoenix::new_<ast::TransformerExpr>(qi::_1, qi::_2, qi::_3)];
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 
         // Statement rules
         let_stmt = lit("let") >> ident >> '=' >> expr;
@@ -69,7 +76,10 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
         autonomic_stmt = lit("with") >> lit("autonomic") >> '{' >> *stmt >> '}';
         model_stmt = lit("model") >> ident >> '{' >> *stmt >> '}';
         custom_loss_stmt = lit("fn") >> ident >> '(' >> (ident % ',') >> ')' >> '{' >> lit("return") >> expr >> '}';
+<<<<<<< HEAD
         auto agent_tune_stmt_rule = lit("agent_tune") >> '(' >> expr >> ',' >> lit("agents:") >> int_ >> ',' >> lit("target:") >> lexeme[*(char_ - ')')] >> ')';
+=======
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
         
         stmt = let_stmt [qi::_val = phoenix::new_<ast::LetStmt>(qi::_1, qi::_2, qi::_3)] |
                train_stmt [qi::_val = phoenix::new_<ast::TrainStmt>(qi::_1, qi::_2, qi::_3, qi::_4, qi::_5, qi::_6, qi::_7, qi::_8)] |
@@ -88,8 +98,12 @@ struct Parser : qi::grammar<Iterator, ast::Program(), qi::space_type> {
                distribute_stmt [qi::_val = phoenix::new_<ast::DistributeStmt>(qi::_1, qi::_2)] |
                autonomic_stmt [qi::_val = phoenix::new_<ast::AutonomicStmt>(qi::_1)] |
                model_stmt [qi::_val = phoenix::new_<ast::ModelStmt>(qi::_1, qi::_2)] |
+<<<<<<< HEAD
                custom_loss_stmt [qi::_val = phoenix::new_<ast::CustomLossStmt>(qi::_1, qi::_2, qi::_3)] |
                agent_tune_stmt_rule [qi::_val = phoenix::new_<ast::AgentTuneStmt>(qi::_1, qi::_2, qi::_3, qi::_4)];
+=======
+               custom_loss_stmt [qi::_val = phoenix::new_<ast::CustomLossStmt>(qi::_1, qi::_2, qi::_3)];
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
         
         program = *stmt;
     }
@@ -131,6 +145,7 @@ private:
 };
 
 ast::Program parse(const std::string& input) {
+<<<<<<< HEAD
     // Basic sandboxing: reject certain shell-like tokens early
     static const char* forbidden[] = {"`", "$(`", "&&", "||", "|", ";;"};
     for (auto tok : forbidden) {
@@ -138,6 +153,8 @@ ast::Program parse(const std::string& input) {
             throw std::runtime_error(std::string("Forbidden token in input: ") + tok);
         }
     }
+=======
+>>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
     ast::Program program;
     Parser<std::string::const_iterator> parser;
     auto iter = input.begin();

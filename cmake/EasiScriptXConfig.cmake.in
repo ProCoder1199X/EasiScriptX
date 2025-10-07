@@ -6,7 +6,7 @@
 # Include directories
 set(EasiScriptX_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/include/esx")
 
-# Library directories
+# Library directories:
 set(EasiScriptX_LIBRARY_DIRS "@CMAKE_INSTALL_PREFIX@/lib")
 
 # Libraries
