@@ -51,7 +51,7 @@ Implementation:
 ImportExpr in ast.hpp supports load_pretrained(name) for ONNX Runtime model loading.
 USE_ONNX in config.hpp enables this feature.
 
-### Implemented Features in ESX (v1.0)
+###  Implemented Features in ESX (v1.0)
 - **Core DSL**:
   - Declarative syntax for models, tensors, and training (e.g., `model mymodel { ... }`, `train(mymodel, mnist, ...)`).
   - Supported by ast.hpp (ModelExpr, TrainStmt, Decl, Program).
