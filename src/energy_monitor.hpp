@@ -43,14 +43,15 @@ public:
         }
         
         try {
+            // Try to read RAPL energy from /sys/class/powercap (Linux only)
             std::ifstream energy_file("/sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj");
             if (energy_file.is_open()) {
-                uint64_t energy_uj;
+                uint64_t energy_uj = 0;
                 energy_file >> energy_uj;
                 energy_file.close();
                 
                 // Convert microjoules to joules
-                double energy_j = energy_uj / 1e6;
+                double energy_j = static_cast<double>(energy_uj) / 1e6;
                 
                 // Calculate delta since last reading
                 if (last_cpu_energy > 0) {
@@ -62,8 +63,8 @@ public:
                     return 0.0;
                 }
             }
-        } catch (const std::exception& e) {
-            // RAPL not available, return 0
+        } catch (...) {
+            // RAPL not available (Windows/Mac or no permissions), return 0
         }
         
         return 0.0;
@@ -86,17 +87,17 @@ public:
                 return 0.0;
             }
             
-            nvmlDevice_t device;
+            nvmlDevice_t device = nullptr;
             result = nvmlDeviceGetHandleByIndex(0, &device);
             if (result != NVML_SUCCESS) {
                 return 0.0;
             }
             
-            unsigned long long energy;
+            unsigned long long energy = 0;
             result = nvmlDeviceGetTotalEnergyConsumption(device, &energy);
             if (result == NVML_SUCCESS) {
                 // Convert millijoules to joules
-                double energy_j = energy / 1000.0;
+                double energy_j = static_cast<double>(energy) / 1000.0;
                 
                 // Calculate delta since last reading
                 if (last_gpu_energy > 0) {
@@ -108,7 +109,7 @@ public:
                     return 0.0;
                 }
             }
-        } catch (const std::exception& e) {
+        } catch (...) {
             // NVML not available
         }
 #endif
