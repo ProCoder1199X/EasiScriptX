@@ -635,13 +635,13 @@ struct StreamDatasetExpr : Expr {
 };
 
 /**
- * @brief Kubernetes deployment expression (e.g., deploy("model-service", "gcr.io/model:latest", "production")).
+ * @brief Kubernetes deployment statement (e.g., deploy("model-service", "gcr.io/model:latest", "production")).
  */
-struct DeployExpr : Stmt {
+struct DeployStmt : Stmt {
     std::string name;      // Deployment name
     std::string image;     // Container image
     std::string target;    // Kubernetes namespace or cluster
-    DeployExpr(const Location& loc, const std::string& name, const std::string& image, const std::string& target)
+    DeployStmt(const Location& loc, const std::string& name, const std::string& image, const std::string& target)
         : Stmt(loc), name(name), image(image), target(target) {}
     void validate() const override {
         if (name.empty()) throw std::runtime_error("Empty deployment name at line " + std::to_string(loc.line));

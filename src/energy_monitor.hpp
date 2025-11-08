@@ -7,6 +7,7 @@
 #include <chrono>
 #include <vector>
 #include <thread>
+#include <cstdint>
 #if USE_CUDA
 #include <nvml.h>
 #endif

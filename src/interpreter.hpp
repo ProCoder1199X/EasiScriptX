@@ -18,7 +18,6 @@
 #include <filesystem>
 #include <random>
 #include <thread>
-#include <curl/curl.h>
 #include "security.hpp"
 
 /**
@@ -136,8 +135,15 @@ private:
                       << train->opt << " optimizer on " << train->device
                       << " for " << train->epochs << " epochs" << std::endl;
             
-            // Dynamic batching based on memory availability
-            int batch_size = std::min(32, static_cast<int>(8.0 / (model.torch_tensor.numel() * 1e-9))); // Dynamic batch size
+            // Dynamic batching: compute batch_size = min(32, available_memory / model_size)
+            int64_t model_elements = model.torch_tensor.numel();
+            int64_t model_size_bytes = model_elements * sizeof(float); // Bytes
+            int64_t available_memory_bytes = MAX_MEMORY_GB * 1024LL * 1024LL * 1024LL; // Convert GB to bytes
+            // Account for gradients (2x) and activations (2x) = 4x total
+            int batch_size = std::min(32, static_cast<int>(available_memory_bytes / (model_size_bytes * 4 + 1))); 
+            batch_size = std::max(1, batch_size); // Ensure at least batch size 1
+            std::cout << "Dynamic batch size: " << batch_size << " (model_size: " << model_size_bytes 
+                      << " bytes, available: " << available_memory_bytes << " bytes)" << std::endl;
             
             // Mock training loop with profiling
             auto training_start = std::chrono::high_resolution_clock::now();
@@ -150,8 +156,31 @@ private:
             std::cout << "Training completed in " << training_duration.count() << "us" << std::endl;
         } else if (auto* pp = dynamic_cast<ast::PipelineParallelStmt*>(stmt.get())) {
             auto model = execute_expr(pp->model);
+            
+            // Pipeline parallelism: split model into stages with NCCL communication
             Distributed::init_multi_gpu(pp->stages);
-            std::cout << "Pipeline parallelism with " << pp->stages << " stages" << std::endl;
+            
+            // Split model layers across stages
+            int64_t total_layers = model.torch_tensor.numel() > 0 ? 10 : 1; // Estimate layer count
+            int layers_per_stage = std::max(1, static_cast<int>(total_layers / pp->stages));
+            
+            std::cout << "Pipeline parallelism: " << pp->stages << " stages, " 
+                      << layers_per_stage << " layers per stage" << std::endl;
+            
+            // In full implementation, would:
+            // 1. Split model into pp->stages segments
+            // 2. Assign each segment to a different GPU
+            // 3. Use NCCL for inter-stage communication
+            // 4. Implement pipeline scheduling (GPipe or PipeDream)
+            
+            for (int stage = 0; stage < pp->stages; ++stage) {
+                int start_layer = stage * layers_per_stage;
+                int end_layer = (stage + 1) * layers_per_stage;
+                std::cout << "  Stage " << stage << ": layers " << start_layer << "-" << end_layer << std::endl;
+            }
+            
+            // Synchronize all stages (stub - would use NCCL barrier in full implementation)
+            std::cout << "Pipeline stages initialized and ready" << std::endl;
         } else if (auto* it = dynamic_cast<ast::InstructionTuneStmt*>(stmt.get())) {
             auto model = execute_expr(it->model);
             auto dataset = execute_expr(it->dataset);
@@ -254,29 +283,37 @@ private:
             if (curl) {
                 // Create run (POST /api/2.0/mlflow/runs/create)
                 std::string create_url = uri + "/api/2.0/mlflow/runs/create";
-                curl_easy_setopt(curl, CURLOPT_URL, create_url.c_str());
-                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, 
-                    ("{\"experiment_id\":\"0\",\"start_time\":" + 
+                std::string create_json = "{\"experiment_id\":\"0\",\"start_time\":" + 
                      std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-                         std::chrono::system_clock::now().time_since_epoch()).count()) + "}").c_str());
-                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, 
-                    curl_slist_append(nullptr, "Content-Type: application/json"));
+                         std::chrono::system_clock::now().time_since_epoch()).count()) + "}";
+                
+                curl_easy_setopt(curl, CURLOPT_URL, create_url.c_str());
+                curl_easy_setopt(curl, CURLOPT_POSTFIELDS, create_json.c_str());
+                
+                struct curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
+                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_callback);
                 
                 std::string response;
                 curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
                 CURLcode res = curl_easy_perform(curl);
+                curl_slist_free_all(headers);
                 
                 if (res == CURLE_OK) {
                     // Log metrics (POST /api/2.0/mlflow/runs/log-metric)
                     std::string metric_url = uri + "/api/2.0/mlflow/runs/log-metric";
-                    curl_easy_setopt(curl, CURLOPT_URL, metric_url.c_str());
-                    curl_easy_setopt(curl, CURLOPT_POSTFIELDS,
-                        ("{\"run_id\":\"" + te->run_id + 
+                    std::string metric_json = "{\"run_id\":\"" + te->run_id + 
                          "\",\"key\":\"loss\",\"value\":0.5,\"timestamp\":" +
                          std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-                             std::chrono::system_clock::now().time_since_epoch()).count()) + "}").c_str());
+                             std::chrono::system_clock::now().time_since_epoch()).count()) + "}";
+                    
+                    curl_easy_setopt(curl, CURLOPT_URL, metric_url.c_str());
+                    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, metric_json.c_str());
+                    
+                    headers = curl_slist_append(nullptr, "Content-Type: application/json");
+                    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
                     curl_easy_perform(curl);
+                    curl_slist_free_all(headers);
                     
                     std::cout << "MLflow logging successful. Run ID: " << te->run_id << std::endl;
                 } else {
@@ -318,7 +355,7 @@ private:
                 if (score > best) best = score;
             }
             std::cout << "Agent tuning complete. Target=" << at->target_metric << ", best=" << best << std::endl;
-        } else if (auto* deploy = dynamic_cast<ast::DeployExpr*>(stmt.get())) {
+        } else if (auto* deploy = dynamic_cast<ast::DeployStmt*>(stmt.get())) {
             // Kubernetes deployment stub (full k8s-cpp integration in v1.1)
             std::cout << "Kubernetes deployment stub: Deploying to " << deploy->target << std::endl;
             // In v1.1, would use k8s-cpp:
