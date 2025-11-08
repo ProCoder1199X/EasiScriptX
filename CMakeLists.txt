@@ -88,11 +88,8 @@ FetchContent_MakeAvailable(nlohmann_json)
 
 # libcurl
 find_package(CURL REQUIRED)
-<<<<<<< HEAD
 find_package(OpenSSL QUIET)
 find_package(spdlog QUIET)
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 
 # Source files
 set(ESX_SOURCES
@@ -108,10 +105,7 @@ set(ESX_HEADERS
     src/config.hpp
     src/parser.hpp
     src/interpreter.hpp
-<<<<<<< HEAD
     src/security.hpp
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
     src/tensor.hpp
     src/dataset.hpp
     src/distributed.hpp
@@ -148,7 +142,6 @@ endif()
 if(onnxruntime_FOUND)
     target_link_libraries(esx onnxruntime::onnxruntime)
 endif()
-<<<<<<< HEAD
 if(OpenSSL_FOUND)
     target_compile_definitions(esx PRIVATE USE_OPENSSL=1)
     target_link_libraries(esx OpenSSL::SSL OpenSSL::Crypto)
@@ -161,8 +154,6 @@ if(spdlog_FOUND)
 else()
     target_compile_definitions(esx PRIVATE USE_SPDLOG=0)
 endif()
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 
 # Compiler definitions
 target_compile_definitions(esx PRIVATE
@@ -191,7 +182,6 @@ endif()
 if(Torch_FOUND)
     target_link_libraries(test_esx ${TORCH_LIBRARIES})
 endif()
-<<<<<<< HEAD
 if(onnxruntime_FOUND)
     target_link_libraries(test_esx onnxruntime::onnxruntime)
 endif()
@@ -201,8 +191,6 @@ endif()
 if(spdlog_FOUND)
     target_link_libraries(test_esx spdlog::spdlog)
 endif()
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 
 # Benchmarks
 add_executable(benchmark benchmarks/benchmark.cpp ${ESX_HEADERS})
@@ -219,15 +207,12 @@ if(MPI_CXX_FOUND)
     target_link_libraries(benchmark MPI::MPI_CXX)
 endif()
 
-<<<<<<< HEAD
 option(ESX_ENABLE_ASAN "Enable AddressSanitizer" OFF)
 if(ESX_ENABLE_ASAN AND NOT MSVC)
     add_compile_options(-fsanitize=address)
     add_link_options(-fsanitize=address)
 endif()
 
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 if(Torch_FOUND)
     target_link_libraries(benchmark ${TORCH_LIBRARIES})
 endif()

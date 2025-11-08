@@ -7,3 +7,6 @@ pretrained/
 docs/api/
 esx.log
 *.swp
+
+.github/instructions/kluster-code-verify.instructions.md
+.kluster

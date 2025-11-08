@@ -553,7 +553,6 @@ struct CustomLossStmt : Stmt {
 };
 
 /**
-<<<<<<< HEAD
  * @brief Agent-based tuning statement (e.g., agent_tune(model, agents: 4, target: "val_acc")).
  */
 struct AgentTuneStmt : Stmt {
@@ -570,8 +569,6 @@ struct AgentTuneStmt : Stmt {
 };
 
 /**
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
  * @brief Program containing all statements.
  */
 struct Program {

@@ -16,27 +16,44 @@ struct Model {
 
     void add_dense(int units, const std::string& act) {
         layers.push_back([units, act](const Tensor& input) {
-            Tensor w(Tensor::pool.allocate(units * input.shape[1]), {input.shape[1], units});
+            // Create weight tensor
+            std::vector<std::vector<double>> weight_data(units, std::vector<double>(input.data[0].size(), 0.1));
+            Tensor w(weight_data);
             Tensor result = input.matmul(w);
-            if (act == "relu") result.data = torch::relu(result.data);
+            if (act == "relu") {
+                result.torch_tensor = torch::relu(result.torch_tensor);
+            }
             return result;
         });
-        parameters.push_back(torch::randn({units, input.shape[1]}));
+        // Initialize parameters with random values
+        int64_t input_size = 128; // Default input size
+        parameters.push_back(torch::randn({units, input_size}));
     }
 
     void add_attention(int heads, int dim) {
         layers.push_back([heads, dim](const Tensor& input) {
             auto attn = torch::nn::MultiheadAttention(torch::nn::MultiheadAttentionOptions(dim, heads));
-            auto output = attn->forward(input.data, input.data, input.data);
-            return Tensor{output.first, {input.shape[0], static_cast<size_t>(dim)}};
+            auto output = attn->forward(input.torch_tensor, input.torch_tensor, input.torch_tensor);
+            // Convert output tensor back to Tensor
+            std::vector<std::vector<double>> output_data(output.first.size(0), std::vector<double>(output.first.size(1)));
+            auto accessor = output.first.accessor<float, 2>();
+            for (int64_t i = 0; i < output.first.size(0); ++i) {
+                for (int64_t j = 0; j < output.first.size(1); ++j) {
+                    output_data[i][j] = static_cast<double>(accessor[i][j]);
+                }
+            }
+            return Tensor(output_data);
         });
         parameters.push_back(torch::randn({dim, dim}));
     }
 
     void add_dropout(double rate) {
         layers.push_back([rate](const Tensor& input) {
-            Tensor mask = Tensor::random_mask(input.shape, rate);
-            return input * mask;
+            // Apply dropout by zeroing out random elements
+            Tensor result = input;
+            auto mask = torch::rand_like(input.torch_tensor) > rate;
+            result.torch_tensor = input.torch_tensor * mask.to(input.torch_tensor.dtype());
+            return result;
         });
     }
 

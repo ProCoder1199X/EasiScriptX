@@ -5,12 +5,11 @@
 #include <vector>
 #include <memory>
 #include <string>
-<<<<<<< HEAD
+#include <thread>
+#include <chrono>
 #if USE_SPDLOG
 #include <spdlog/spdlog.h>
 #endif
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
 
 /**
  * @file distributed.hpp
@@ -47,12 +46,9 @@ public:
      */
     static bool init_multi_gpu(int num_gpus) {
         ESX_DEBUG("DISTRIBUTED", "Initializing multi-GPU with " << num_gpus << " GPUs");
-<<<<<<< HEAD
-        #if USE_SPDLOG
+#if USE_SPDLOG
         spdlog::info("Initializing multi-GPU with {} GPUs", num_gpus);
-        #endif
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
+#endif
         
 #if USE_NCCL && USE_CUDA
         try {
@@ -74,21 +70,15 @@ public:
             initialized = true;
             
             ESX_DEBUG("DISTRIBUTED", "NCCL initialized successfully");
-<<<<<<< HEAD
-            #if USE_SPDLOG
+#if USE_SPDLOG
             spdlog::info("NCCL initialized successfully");
-            #endif
+#endif
             return true;
         } catch (const std::exception& e) {
             ESX_DEBUG("DISTRIBUTED", "NCCL initialization failed: " << e.what());
-            #if USE_SPDLOG
+#if USE_SPDLOG
             spdlog::error("NCCL initialization failed: {}", e.what());
-            #endif
-=======
-            return true;
-        } catch (const std::exception& e) {
-            ESX_DEBUG("DISTRIBUTED", "NCCL initialization failed: " << e.what());
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
+#endif
             return init_cpu_fallback();
         }
 #else
@@ -104,12 +94,9 @@ public:
      */
     static bool init_multi_node(int num_nodes) {
         ESX_DEBUG("DISTRIBUTED", "Initializing multi-node with " << num_nodes << " nodes");
-<<<<<<< HEAD
-        #if USE_SPDLOG
+#if USE_SPDLOG
         spdlog::info("Initializing multi-node with {} nodes", num_nodes);
-        #endif
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
+#endif
         
 #if USE_MPI
         try {
@@ -126,21 +113,15 @@ public:
             
             initialized = true;
             ESX_DEBUG("DISTRIBUTED", "MPI initialized: rank " << world_rank << "/" << world_size);
-<<<<<<< HEAD
-            #if USE_SPDLOG
+#if USE_SPDLOG
             spdlog::info("MPI initialized: rank {}/{}", world_rank, world_size);
-            #endif
+#endif
             return true;
         } catch (const std::exception& e) {
             ESX_DEBUG("DISTRIBUTED", "MPI initialization failed: " << e.what());
-            #if USE_SPDLOG
+#if USE_SPDLOG
             spdlog::error("MPI initialization failed: {}", e.what());
-            #endif
-=======
-            return true;
-        } catch (const std::exception& e) {
-            ESX_DEBUG("DISTRIBUTED", "MPI initialization failed: " << e.what());
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
+#endif
             return false;
         }
 #else
@@ -157,12 +138,9 @@ public:
      */
     static bool aggregate_gradients(std::vector<std::vector<double>>& gradients, int retry_count = 3) {
         ESX_DEBUG("DISTRIBUTED", "Aggregating gradients across " << world_size << " processes");
-<<<<<<< HEAD
 #if USE_SPDLOG
         spdlog::info("Aggregating gradients across {} processes", world_size);
 #endif
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
         
         for (int retry = 0; retry < retry_count; ++retry) {
             try {
@@ -175,12 +153,9 @@ public:
                     }
                 }
                 ESX_DEBUG("DISTRIBUTED", "Gradient aggregation successful");
-<<<<<<< HEAD
 #if USE_SPDLOG
                 spdlog::info("Gradient aggregation successful");
 #endif
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
                 return true;
 #else
                 ESX_DEBUG("DISTRIBUTED", "MPI not available, skipping gradient aggregation");
@@ -188,12 +163,9 @@ public:
 #endif
             } catch (const std::exception& e) {
                 ESX_DEBUG("DISTRIBUTED", "Gradient aggregation failed (attempt " << (retry + 1) << "): " << e.what());
-<<<<<<< HEAD
 #if USE_SPDLOG
                 spdlog::warn("Gradient aggregation failed (attempt {}): {}", retry + 1, e.what());
 #endif
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
                 if (retry == retry_count - 1) {
                     return false;
                 }
@@ -212,21 +184,15 @@ public:
 #if USE_MPI
         try {
             MPI_Barrier(MPI_COMM_WORLD);
-<<<<<<< HEAD
-            #if USE_SPDLOG
+#if USE_SPDLOG
             spdlog::debug("Synchronization barrier passed");
-            #endif
+#endif
             return true;
         } catch (const std::exception& e) {
             ESX_DEBUG("DISTRIBUTED", "Synchronization failed: " << e.what());
-            #if USE_SPDLOG
+#if USE_SPDLOG
             spdlog::warn("Synchronization failed: {}", e.what());
-            #endif
-=======
-            return true;
-        } catch (const std::exception& e) {
-            ESX_DEBUG("DISTRIBUTED", "Synchronization failed: " << e.what());
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
+#endif
             return false;
         }
 #else
@@ -239,12 +205,9 @@ public:
      */
     static void finalize() {
         ESX_DEBUG("DISTRIBUTED", "Finalizing distributed training");
-<<<<<<< HEAD
-        #if USE_SPDLOG
+#if USE_SPDLOG
         spdlog::info("Finalizing distributed training");
-        #endif
-=======
->>>>>>> 950d1118cac891f75f2608808a5bf0fda573f60f
+#endif
         
 #if USE_NCCL
         for (auto& comm : comms) {
