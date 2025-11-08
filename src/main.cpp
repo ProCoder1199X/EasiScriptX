@@ -7,6 +7,11 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <chrono>
+#if USE_CUDA
+#include <cuda_runtime.h>
+#include <torch/cuda.h>
+#endif
 
 /**
  * @file main.cpp
@@ -71,6 +76,19 @@ bool execute_file(const std::string& filename, bool profile = false) {
         }
         
         return true;
+    } catch (const torch::cuda::OutOfMemoryError& e) {
+        // CUDA out of memory error handling
+        std::cerr << "CUDA out of memory error: " << e.what() << std::endl;
+        std::cerr << "Try reducing batch size or model size." << std::endl;
+        esx::error::get_error_handler().report_error(
+            esx::error::RuntimeError("CUDA OOM: " + std::string(e.what())));
+        return false;
+    } catch (const torch::Error& e) {
+        // General PyTorch/CUDA error handling
+        std::cerr << "PyTorch/CUDA error: " << e.what() << std::endl;
+        esx::error::get_error_handler().report_error(
+            esx::error::RuntimeError("PyTorch error: " + std::string(e.what())));
+        return false;
     } catch (const esx::error::ESXError& e) {
         esx::error::get_error_handler().report_error(e);
         return false;

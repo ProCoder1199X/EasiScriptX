@@ -6,6 +6,8 @@
 #include "dataset.hpp"
 #include "distributed.hpp"
 #include "model.hpp"
+#include "config.hpp"
+#include "energy_monitor.hpp"
 #include <torch/torch.h>
 #include <onnxruntime_cxx_api.h>
 #include <map>
@@ -15,6 +17,8 @@
 #include <chrono>
 #include <filesystem>
 #include <random>
+#include <thread>
+#include <curl/curl.h>
 #include "security.hpp"
 
 /**
@@ -173,11 +177,7 @@ private:
                 
                 // Compute loss (supervised fine-tuning loss)
                 // In full implementation, would use cross-entropy with target responses
-                double loss = 0.0;
-                if (train->loss == "ce") {
-                    // Cross-entropy loss for instruction tuning
-                    loss = 0.5; // Mock loss
-                }
+                double loss = 0.5; // Mock loss for instruction tuning
                 
                 // Backward pass (gradients computed)
                 // In full implementation, would call backward() on model
@@ -198,8 +198,21 @@ private:
                       << ", GPU=" << hs->gpu_ratio << std::endl;
         } else if (auto* ea = dynamic_cast<ast::EnergyAwareStmt*>(stmt.get())) {
             auto model = execute_expr(ea->model);
-            model.energy_usage += ea->max_power * 0.001; // Mock RAPL
-            std::cout << "Energy-aware scheduling with max power " << ea->max_power << "W" << std::endl;
+            
+            // Real energy monitoring with RAPL (CPU) and NVML (GPU)
+            EnergyMonitor energy_monitor;
+            double current_power = energy_monitor.monitor_power(0.1); // Monitor for 100ms
+            
+            if (current_power > ea->max_power) {
+                std::cout << "Warning: Power limit exceeded! Current: " << current_power 
+                          << "W, Max: " << ea->max_power << "W" << std::endl;
+                // Throttle operations to reduce power consumption
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            
+            model.energy_usage = energy_monitor.get_total_energy();
+            std::cout << "Energy-aware scheduling: Current power " << current_power 
+                      << "W (max: " << ea->max_power << "W)" << std::endl;
         } else if (auto* sf = dynamic_cast<ast::SwitchFrameworkStmt*>(stmt.get())) {
             // Enhanced error handling for model paths
             if (!std::filesystem::exists(sf->model_path)) {
@@ -222,6 +235,13 @@ private:
                 }
             } else if (sf->framework == "tensorflow") {
                 throw std::runtime_error("TensorFlow framework support is not yet implemented.");
+            } else if (sf->framework == "jax") {
+                // JAX interop stub (full implementation with jaxlib C++ bindings in v1.1)
+                std::cout << "JAX framework stub: Loading model from " << sf->model_path << std::endl;
+                // In v1.1, would use jaxlib C++ bindings:
+                // jax::DeviceArray device_array = jax::load_array(sf->model_path);
+                // Convert to PyTorch tensor for compatibility
+                std::cout << "JAX model loaded (stub). Full jaxlib integration in v1.1." << std::endl;
             } else {
                 throw std::runtime_error("Unsupported framework: " + sf->framework);
             }
@@ -298,6 +318,15 @@ private:
                 if (score > best) best = score;
             }
             std::cout << "Agent tuning complete. Target=" << at->target_metric << ", best=" << best << std::endl;
+        } else if (auto* deploy = dynamic_cast<ast::DeployExpr*>(stmt.get())) {
+            // Kubernetes deployment stub (full k8s-cpp integration in v1.1)
+            std::cout << "Kubernetes deployment stub: Deploying to " << deploy->target << std::endl;
+            // In v1.1, would use k8s-cpp:
+            // k8s::ApiClient client;
+            // k8s::Deployment deployment = k8s::create_deployment(deploy->name, deploy->image);
+            // client.apply_deployment(deployment);
+            std::cout << "Deployment " << deploy->name << " to " << deploy->target 
+                      << " (stub). Full k8s-cpp integration in v1.1." << std::endl;
         } else {
             throw std::runtime_error("Unknown statement at line " + std::to_string(stmt->loc.line));
         }

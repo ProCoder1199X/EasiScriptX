@@ -5,6 +5,8 @@
 #include <string>
 #include <torch/torch.h>
 #include <Eigen/Dense>
+#include "config.hpp"
+#include "energy_monitor.hpp"
 
 /**
  * @file tensor.hpp

@@ -634,6 +634,22 @@ struct StreamDatasetExpr : Expr {
     }
 };
 
+/**
+ * @brief Kubernetes deployment expression (e.g., deploy("model-service", "gcr.io/model:latest", "production")).
+ */
+struct DeployExpr : Stmt {
+    std::string name;      // Deployment name
+    std::string image;     // Container image
+    std::string target;    // Kubernetes namespace or cluster
+    DeployExpr(const Location& loc, const std::string& name, const std::string& image, const std::string& target)
+        : Stmt(loc), name(name), image(image), target(target) {}
+    void validate() const override {
+        if (name.empty()) throw std::runtime_error("Empty deployment name at line " + std::to_string(loc.line));
+        if (image.empty()) throw std::runtime_error("Empty image at line " + std::to_string(loc.line));
+        if (target.empty()) throw std::runtime_error("Empty target at line " + std::to_string(loc.line));
+    }
+};
+
 } // namespace esx::ast
 
 #endif // ESX_AST_HPP

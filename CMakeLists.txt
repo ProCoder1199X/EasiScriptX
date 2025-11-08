@@ -115,6 +115,7 @@ set(ESX_HEADERS
     src/error_handler.hpp
     src/onnx_export.hpp
     src/repl.hpp
+    src/energy_monitor.hpp
 )
 
 # Main executable
